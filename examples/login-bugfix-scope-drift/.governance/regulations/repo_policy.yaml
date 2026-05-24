@@ -1,0 +1,31 @@
+id: REG-REPO-001
+name: repository_change_policy
+rules:
+  - id: REG-REPO-001-A
+    name: docs_changes_low_risk
+    applies_to:
+      paths:
+        - docs/**
+        - .governance/**
+        - '*.md'
+    risk_level: low
+    required_review: optional
+  - id: REG-REPO-001-B
+    name: source_changes_medium_risk
+    applies_to:
+      paths:
+        - src/**
+        - packages/**
+        - lib/**
+    risk_level: medium
+    required_review: agent_self_check
+  - id: REG-REPO-001-C
+    name: production_config_high_risk
+    applies_to:
+      paths:
+        - infra/**
+        - deploy/**
+        - .github/workflows/**
+        - k8s/**
+    risk_level: high
+    required_review: human

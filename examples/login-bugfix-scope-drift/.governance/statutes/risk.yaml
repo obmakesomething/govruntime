@@ -1,0 +1,7 @@
+id: RISK-001
+name: risk_simulation_threshold
+version: '0.1'
+trigger_simulation_when:
+  ambiguity: '>= 0.50'
+  scope_drift_probability: '>= 0.40'
+  blast_radius: high or critical

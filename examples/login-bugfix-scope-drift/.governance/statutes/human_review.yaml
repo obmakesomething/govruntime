@@ -1,0 +1,8 @@
+id: HUMAN-001
+name: human_review_required
+version: '0.1'
+required_for:
+  - policy_override
+  - destructive_action_in_production
+  - enterprise_policy_change
+  - precedent_overrule

@@ -1,0 +1,9 @@
+id: TOOL-001
+name: tool_call_governance
+version: '0.1'
+rule: All tool calls must be within the active ticket scope. Destructive actions require explicit authorization.
+destructive_actions:
+  - rm -rf
+  - drop table
+  - truncate
+  - delete production data

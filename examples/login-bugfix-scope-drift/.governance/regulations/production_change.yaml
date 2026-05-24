@@ -1,0 +1,8 @@
+id: REG-PROD-001
+name: production_change_policy
+rule: 'Production changes require: active ticket, human review, explicit authorization evidence.'
+applies_to:
+  environments:
+    - production
+    - prod
+    - live

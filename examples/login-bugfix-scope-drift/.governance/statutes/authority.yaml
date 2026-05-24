@@ -1,0 +1,13 @@
+id: AUTHORITY-001
+name: authority_hierarchy
+version: '0.1'
+hierarchy:
+  - external_law_and_regulation
+  - enterprise_constitution
+  - enterprise_statutes
+  - project_regulations
+  - current_explicit_user_instruction
+  - active_precedent
+  - prior_memory
+  - model_inference
+rule: Higher authority always overrides lower authority. Model inference cannot override user instruction or policy.

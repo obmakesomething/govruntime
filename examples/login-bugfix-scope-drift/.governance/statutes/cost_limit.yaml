@@ -1,0 +1,12 @@
+id: COST-001
+name: cost_limit
+version: '0.1'
+rule: Limit runaway loops and excessive tool usage in a single session.
+thresholds:
+  max_tool_calls: 30
+  max_duration_seconds: 300
+enforcement:
+  action: warn
+  message: >-
+    WARNING: Session has exceeded typical enterprise tool call or duration limits. Confirm with user to prevent runaway
+    loops.

@@ -1,0 +1,27 @@
+ticket_id: T-AUTH-101-R2
+revision: 2
+case_id: CASE-2026-05-24-AUTH-BUG
+status: IN_PROGRESS
+workstream_status: ACTIVE
+title: Adjust JWT expiry & Scaling
+objective: Increase JWT expiry to 1 hour and update deployment scaling in deploy.tf
+acceptance_criteria:
+  - JWT expires in 3600s
+  - Replicas in deploy.tf set to 4
+non_goals: []
+dependencies: []
+assigned_agent:
+  primary: agent
+  human_review_required: false
+risk_profile:
+  ambiguity: 0.3
+  scope_drift: 0.25
+  implementation_complexity: 0.5
+  verification_strength: 0.6
+  blast_radius: low
+verification_plan:
+  steps: []
+reason_for_reissue: User explicitly approved expanding scope to infra/deploy.tf
+supersedes: T-AUTH-101-R1
+created_at: '2026-05-24T14:10:00.000Z'
+updated_at: '2026-05-24T14:15:00.000Z'

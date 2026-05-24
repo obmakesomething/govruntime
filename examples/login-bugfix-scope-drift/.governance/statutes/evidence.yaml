@@ -1,0 +1,17 @@
+id: EVIDENCE-001
+name: tiered_evidence
+version: '0.1'
+tiers:
+  '1': user_statement
+  '2':
+    - tool_output
+    - test_result
+    - file_diff
+    - repo_state
+  '3': policy_document
+  '4':
+    - prior_decision
+    - precedent_reference
+  '5': simulation_result
+  '6': model_inference
+rule: Higher-tier evidence takes precedence. Model inference (Tier 6) is never sufficient for high-risk decisions.

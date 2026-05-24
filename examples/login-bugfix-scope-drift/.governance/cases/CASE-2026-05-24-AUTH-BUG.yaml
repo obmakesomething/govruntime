@@ -1,0 +1,31 @@
+case_id: CASE-2026-05-24-AUTH-BUG
+status: OPEN
+title: Fix login timeout bug
+opened_at: '2026-05-24T14:00:00.000Z'
+issue:
+  - Fix login timeout bug
+claims:
+  user_claims:
+    - Increase JWT expiry to 1 hour
+evidence:
+  - EV-1
+  - EV-2
+applicable_law:
+  constitution:
+    - preserve_user_intent_continuity
+    - maintain_auditability
+    - track_procedural_history
+  statutes:
+    - SCOPE-001
+    - TICKET-REISSUE-001
+    - BRANCH-001
+    - DOCKET-001
+precedents:
+  - P-001
+  - P-002
+  - P-003
+  - P-004
+related_tickets:
+  - T-AUTH-101-R1
+  - T-AUTH-101-R2
+tags: []

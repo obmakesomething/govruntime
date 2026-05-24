@@ -1,0 +1,19 @@
+precedent_id: P-003
+case_id: BOOTSTRAP
+status: active
+issue:
+  - Are AGENTS.md and CLAUDE.md sufficient for governance?
+holding:
+  - Prompt files are not governance. Governance requires structured, enforceable state.
+material_facts:
+  - Prompt files can be ignored or overridden by model inference.
+  - Governance requires hooks, state files, judgment engine, and audit trail.
+rule:
+  - AGENTS.md and CLAUDE.md are summaries, not the governance system.
+  - Authoritative governance state lives in .governance/.
+applies_when:
+  - agent treats AGENTS.md as the only governance source
+  - agent ignores .governance/ state
+overridable_by:
+  - enterprise_policy_update
+created_at: '2026-05-24T07:08:44.457Z'

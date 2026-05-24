@@ -1,0 +1,15 @@
+id: GIT-001
+name: prevent_direct_main_commit
+version: '0.1'
+rule: >-
+  Do not commit directly to main or master branch. All changes must be done via a branch tied to a case/ticket, followed
+  by a PR.
+applies_to:
+  branches:
+    - main
+    - master
+enforcement:
+  action: block
+  message: >-
+    Direct commits to main/master are blocked by governance policy GIT-001. Create a branch using 'govctl branch create'
+    first.

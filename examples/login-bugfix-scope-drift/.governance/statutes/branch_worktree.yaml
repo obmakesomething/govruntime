@@ -1,0 +1,11 @@
+id: BRANCH-001
+name: no_orphan_branch_or_worktree
+version: '0.1'
+rule: >-
+  Every branch and worktree must have a ledger entry with case_id, ticket_id, reason_created, intended_scope,
+  forbidden_scope, and exit_conditions.
+forbidden:
+  - branch_without_case
+  - branch_without_ticket
+  - branch_without_intended_scope
+  - worktree_without_ledger_entry

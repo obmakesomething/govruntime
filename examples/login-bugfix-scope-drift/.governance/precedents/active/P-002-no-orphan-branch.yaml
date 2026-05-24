@@ -1,0 +1,18 @@
+precedent_id: P-002
+case_id: BOOTSTRAP
+status: active
+issue:
+  - Can a branch exist without a governance ledger entry?
+holding:
+  - No branch or worktree may exist without a ledger entry.
+material_facts:
+  - Git log records what changed, not why.
+  - Ledger records why the branch was created, its scope, and exit conditions.
+rule:
+  - Every branch must have a case_id, ticket_id, reason_created, intended_scope, and exit_conditions.
+applies_when:
+  - agent attempts to create a branch without govctl
+  - branch exists without case_id in ledger
+overridable_by:
+  - enterprise_policy_update
+created_at: '2026-05-24T07:08:44.457Z'

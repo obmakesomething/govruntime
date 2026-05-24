@@ -1,0 +1,10 @@
+id: REG-AGENT-001
+name: coding_agent_policy
+rules:
+  - id: REG-AGENT-001-A
+    name: no_action_without_active_ticket
+    rule: Agent must not edit files or run commands without an active ticket.
+    exception: Exploratory read-only operations (list, search, read) are permitted.
+  - id: REG-AGENT-001-B
+    name: prefer_evidence_over_inference
+    rule: Agent must cite evidence for design decisions. Model inference alone is insufficient for code changes.

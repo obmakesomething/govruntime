@@ -1,0 +1,22 @@
+id: SCOPE-001
+name: no_silent_scope_expansion
+version: '0.1'
+applies_to:
+  hook_events:
+    - PreToolUse
+    - Stop
+condition:
+  action_outside_active_ticket: true
+required_evidence:
+  - active_case
+  - active_ticket
+  - user_authorization_or_ticket_reissue
+decision:
+  if_missing_evidence: warn
+  if_minor_scope_expansion: create_discovered_issue
+  if_major_scope_expansion: require_human_review
+enforcement:
+  hook: PreToolUse
+  message: Action is outside the active ticket. Create or reissue a ticket before executing.
+audit:
+  log_event: execution_blocked

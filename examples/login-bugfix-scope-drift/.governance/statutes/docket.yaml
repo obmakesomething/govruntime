@@ -1,0 +1,13 @@
+id: DOCKET-001
+name: docket_event_required
+version: '0.1'
+rule: Every governance state change must produce a docket event explaining why.
+required_for:
+  - case_opened
+  - ticket_issued
+  - ticket_reissued
+  - ticket_paused
+  - ticket_resumed
+  - workstream_deepened
+  - branch_created
+  - execution_blocked

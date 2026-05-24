@@ -1,0 +1,24 @@
+precedent_id: P-001
+case_id: BOOTSTRAP
+status: active
+issue:
+  - Should enterprise agent governance be a generic memory layer?
+holding:
+  - Enterprise agent governance must be intent governance, not generic memory.
+material_facts:
+  - Generic memory has no authority hierarchy.
+  - Generic memory cannot distinguish correction from continuation.
+  - Intent governance separates case, ticket, evidence, and enforcement.
+rule:
+  - >-
+    Future architecture proposals must prioritize governance, evidence, tickets, cases, docket, and enforcement over
+    generic memory.
+applies_when:
+  - agent proposes memory-only architecture
+  - agent ignores ticket/case state
+  - agent ignores procedural history
+overridable_by:
+  - explicit_current_user_correction
+  - enterprise_policy_update
+  - new_case_judgment
+created_at: '2026-05-24T07:08:44.456Z'

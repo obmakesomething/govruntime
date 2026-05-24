@@ -1,0 +1,10 @@
+id: TICKET-REISSUE-001
+name: immutable_ticket_revision
+version: '0.1'
+rule: Tickets must never be silently mutated. Use immutable revisions (R1, R2, R3).
+trigger:
+  - user_correction
+  - scope_change
+  - priority_shift
+  - deepen
+effect: Create new revision, mark old ticket SUPERSEDED.

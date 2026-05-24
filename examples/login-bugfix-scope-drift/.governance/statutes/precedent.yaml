@@ -1,0 +1,8 @@
+id: PRECEDENT-001
+name: precedent_lifecycle
+version: '0.1'
+rule: Precedents are created from case judgments and apply to future cases with matching conditions.
+overridable_by:
+  - explicit_current_user_correction
+  - enterprise_policy_update
+  - new_case_judgment

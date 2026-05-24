@@ -1,0 +1,19 @@
+precedent_id: P-004
+case_id: BOOTSTRAP
+status: active
+issue:
+  - Can the model be the sole decision-maker for governance?
+holding:
+  - The model assists judgment. The governance runtime structures and enforces it.
+material_facts:
+  - Model inference is Tier 6 evidence — lowest authority.
+  - Model cannot override policy, authorize destructive actions, or create precedent unilaterally.
+rule:
+  - Model inference is advisory. Governance judgment is structural.
+applies_when:
+  - agent attempts to override policy based on its own inference
+  - agent claims authority it does not have
+overridable_by:
+  - enterprise_policy_update
+  - explicit_human_override
+created_at: '2026-05-24T07:08:44.457Z'

@@ -1,0 +1,16 @@
+id: INFRA-001
+name: infra_guard
+version: '0.1'
+rule: Editing infrastructure, deployment, or workflow files requires explicit confirmation and active ticket scope.
+applies_to:
+  paths:
+    - infra/**
+    - deploy/**
+    - .github/workflows/**
+    - k8s/**
+    - docker-compose.yml
+enforcement:
+  action: warn
+  message: >-
+    WARNING: You are editing infrastructure files. Ensure this matches the active ticket objective and has been
+    verified.

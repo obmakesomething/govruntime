@@ -1,23 +1,19 @@
 {
-  "name": "ai-legal-governance-runtime",
-  "version": "0.1.0",
-  "description": "AI Legal Governance Runtime — an executable legal system for enterprise AI coding agents",
+  "name": "govruntime",
+  "version": "0.1.0-alpha.0",
+  "description": "Execution governance for coding agents.",
   "private": true,
-  "workspaces": [
-    "packages/govd",
-    "packages/govctl",
-    "packages/mcp-server"
-  ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces --if-present",
-    "dev": "npm run dev --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "build": "pnpm -r run build",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm -r run test --if-present",
+    "dev": "pnpm -r run dev --if-present",
+    "lint": "pnpm -r run lint --if-present",
     "govctl": "node packages/govctl/dist/index.js"
   },
   "engines": {
     "node": ">=20.0.0"
   },
-  "author": "AI Legal Governance Runtime Contributors",
-  "license": "MIT"
+  "author": "GovRuntime Contributors",
+  "license": "Apache-2.0"
 }

@@ -1,0 +1,16 @@
+branches:
+  - branch: gov/CASE-2026-05-24-AUTH-BUG/T-AUTH-101-R2/fix-jwt-expiry
+    case_id: CASE-2026-05-24-AUTH-BUG
+    ticket_id: T-AUTH-101-R2
+    purpose: fix-jwt-expiry
+    branch_type: feature
+    status: active
+    reason_created:
+      - Created for ticket T-AUTH-101-R1/R2
+    intended_scope:
+      - src/auth/**
+      - infra/deploy.tf
+    forbidden_scope: []
+    parent_branch: main
+    created_at: '2026-05-24T14:02:00.000Z'
+    updated_at: '2026-05-24T14:10:00.000Z'
