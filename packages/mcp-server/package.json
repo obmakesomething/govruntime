@@ -1,0 +1,23 @@
+{
+  "name": "@govruntime/mcp-server",
+  "version": "0.1.0",
+  "description": "AI Legal Governance Runtime — MCP Server (read-only Phase 1)",
+  "type": "module",
+  "bin": {
+    "gov-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@govruntime/govd": "*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
