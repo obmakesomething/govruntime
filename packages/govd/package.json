@@ -1,7 +1,7 @@
 {
   "name": "@govruntime/govd",
-  "version": "0.1.0",
-  "description": "AI Legal Governance Runtime Daemon — core governance logic",
+  "version": "0.1.2-alpha.0",
+  "description": "Core governance engine for AI coding-agent execution.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
@@ -24,8 +24,37 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
-    "jest": "^29.0.0",
-    "ts-jest": "^29.0.0",
     "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obmakesomething/govruntime.git"
+  },
+  "homepage": "https://github.com/obmakesomething/govruntime#readme",
+  "bugs": {
+    "url": "https://github.com/obmakesomething/govruntime/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "agent-governance",
+    "ai-governance",
+    "developer-tools",
+    "control-plane",
+    "runtime",
+    "policy-as-code",
+    "audit-log",
+    "codex",
+    "claude-code",
+    "cursor",
+    "mcp"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -19,7 +19,7 @@ import { judgeCompletion } from "../judgment/engine.js";
 import { recordDocketEvent } from "../docket/recorder.js";
 import { readJsonlFile, govPath } from "../state/loader.js";
 import type { DocketEvent } from "../state/types.js";
-import { appendAuditEvent } from "../state/writer.js";
+import { appendAuditEvent, appendCleanStateEvent } from "../state/writer.js";
 import { nowISO } from "../state/ids.js";
 
 export function handleStop(
@@ -76,11 +76,33 @@ export function handleStop(
     });
   }
 
+  const decision = issues.length === 0
+    ? "allow"
+    : state.runtime_config.enforcement_mode === "hard-block"
+      ? "block"
+      : "warn";
+
   appendAuditEvent(state.cwd, {
     event: "stop_evaluated",
     issues,
     judgment_id: judgment.judgment_id,
-    decision: issues.length === 0 ? "allow" : "warn",
+    decision,
+    mode: state.runtime_config.enforcement_mode,
+    product_mode: state.runtime_config.product_mode,
+    created_at: nowISO(),
+  });
+
+  appendCleanStateEvent(state.cwd, {
+    phase: "exit-check",
+    event: "stop_evaluated",
+    issues,
+    judgment_id: judgment.judgment_id,
+    decision,
+    mode: state.runtime_config.enforcement_mode,
+    product_mode: state.runtime_config.product_mode,
+    case_id: active_case?.case_id,
+    ticket_id: active_ticket?.ticket_id,
+    clean: issues.length === 0,
     created_at: nowISO(),
   });
 
@@ -91,9 +113,15 @@ export function handleStop(
     };
   }
 
-  // Phase 1: advisory warning (not hard block)
+  if (decision === "block") {
+    return {
+      decision: "block",
+      reason: `Governance Stop Check failed in hard-block mode:\n${issues.map((i, n) => `  ${n + 1}. ${i}`).join("\n")}\n\nResolve these before stopping.`,
+    };
+  }
+
   return {
     decision: "warn",
-    reason: `⚖️ Governance Stop Check — ${issues.length} advisory issue(s):\n${issues.map((i, n) => `  ${n + 1}. ${i}`).join("\n")}\n\nReview and address before marking complete.`,
+    reason: `Governance Stop Check — ${issues.length} advisory issue(s):\n${issues.map((i, n) => `  ${n + 1}. ${i}`).join("\n")}\n\nReview and address before marking complete.`,
   };
 }

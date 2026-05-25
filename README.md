@@ -1,204 +1,218 @@
 # GovRuntime
 
-### Execution governance for coding agents.
+The open-source control plane for AI coding-agent governance.
 
-GovRuntime keeps Claude Code, Codex, Cursor agents, and other tool-using coding agents inside the work they were actually authorized to do.
+Give Codex, Claude Code, Cursor, and future coding agents a shared runtime for scope control, evidence tracking, policy checks, and clean exits.
 
-Most guardrails ask:
+> Git tracks the diff. GovRuntime tracks the mandate.
 
-> Is this input, output, or tool call safe?
+Status: `0.1.2-alpha.0`  
+Release channel: `alpha-0.1.2`  
+License: Apache-2.0
 
-GovRuntime asks:
+## Why this exists
 
-> Is the agent still acting under the right case, ticket, approved scope, evidence hierarchy, and procedural history?
+AI coding agents are powerful, but "the agent said it was done" is not a governance model.
 
-It gives every meaningful agent action a case, a ticket, a reason, a scope, an evidence basis, and an exit condition.
+GovRuntime answers the procedural questions that appear when agents start changing real repositories:
 
----
+- What task is active?
+- Which files are in scope?
+- What evidence supports this change?
+- Should this action warn or block?
+- Is the repo clean enough to stop?
 
-**Status: v0.1 alpha**
-*GovRuntime is early infrastructure. It is suitable for experimentation, demos, and integration testing. It should not yet be marketed as tamper-proof, compliance-grade, or a replacement for secure sandboxing and human code review.*
+GovRuntime treats coding-agent execution as a lightweight governance system. It records scope, evidence, policy decisions, lifecycle posture, and exit checks in a local `.governance/` state directory.
 
----
+## Not an agent framework
 
-## 1. What is GovRuntime?
-GovRuntime is an **execution governance runtime** for software engineering agents (such as Claude Code, Codex, and Cursor). It acts as an external constraints layer that enforces ticket objectives, matches tool modifications against authorized scopes, and generates an auditable timeline. 
+GovRuntime does not replace Codex, Claude Code, Cursor, OpenHands, LangChain, CrewAI, Mastra, or your own agent stack.
 
-GovRuntime does not make agents more autonomous. It makes their autonomy governable.
+It sits beside them as a governance layer.
 
----
+```text
+Agent framework: does the work.
+GovRuntime: governs how the work is authorized, scoped, checked, and recorded.
+```
 
-## 2. The Core Idea
-AI coding agents need more than prompt instructions. They need a stateful, runtime execution control plane. 
+CI checks what changed. GovRuntime governs how the change happened.
 
-Instead of letting the agent operate as a stateless model that decides its own goals, GovRuntime implements a structured runtime:
-*   Every task is bound to an **Active Case** and **Active Ticket**.
-*   Every code branch must be registered with an **Approved File Scope**.
-*   Agent actions are validated *prior* to tool use against executable rules.
-*   Agent self-justification is treated as low-tier inference, not as authority.
+## Packages
 
----
+- `@govruntime/govd`: core governance engine. Loads `.governance/*`, judges tool use, records docket/audit events, validates path literals, and renders context packs.
+- `@govruntime/govctl`: CLI and platform adapter layer. Provides `init`, `status`, `mode`, `case`, `ticket`, `branch`, `evidence`, `timeline`, `why`, and `hook`.
+- `@govruntime/mcp-server`: read-only MCP server for current posture, active ticket, and docket-derived why.
 
-## 3. Why Guardrails Are Not Enough
-*   **Guardrails check single inputs/outputs**: A guardrail can detect if a response contains a secret or toxic word. It *cannot* detect if the agent is editing `infra/deploy.tf` when it was only assigned to fix a CSS bug.
-*   **Guardrails lack state**: They evaluate each request in isolation. GovRuntime maintains a persistent state machine of the entire development session (Case → Ticket → Approved Scope → Branch -> Timeline).
-*   **Prompts can instruct; GovRuntime checks**: Text files like `AGENTS.md` are passive guidance. Agents can ignore, forget, or override prompts. GovRuntime actively blocks or warns on unauthorized tool execution.
+## Product Shape
 
----
+Recommended integration is a three-layer shape:
 
-## 4. Quickstart
+1. Core control engine: `govd`
+2. Platform adapters: `govctl hook auto`
+3. Product surfaces: CLI, MCP, dashboards, CI hooks, and future SDKs
 
-### Installation
-Install the command line interface globally:
+Claude, Codex, Cursor, and future clients should all route lifecycle events into the same normalized hook event schema. Platform-specific behavior stays in adapters; policy judgment stays in `govd`.
+
+## Runtime Modes
+
+GovRuntime supports two enforcement modes through `.governance/constitution.yaml`:
+
+- `advisory`: warn and record evidence, but allow the host agent to continue.
+- `hard-block`: promote risky warnings and stop-check failures into blocking hook responses.
+
+Use:
+
 ```bash
-npm install -g @govruntime/govctl
+govctl mode show
+govctl mode set advisory
+govctl mode set hard-block
 ```
 
-### Initialize in your Repository
+`GOVRUNTIME_ENFORCEMENT_MODE=hard-block` can override local config for CI or production runs.
+
+## Lifecycle Logs
+
+Clean-state lifecycle events are recorded at:
+
+```text
+.governance/audit/clean_state.jsonl
+```
+
+The intended product lifecycle is:
+
+```text
+init -> run-task -> exit-check
+```
+
+Each event includes mode, product mode, active case/ticket identifiers when available, and whether the posture is clean.
+
+## Path Literal Validation
+
+GovRuntime validates path-like tool inputs and governance-document literals before treating them as reliable execution or evidence references.
+
+Examples of checked keys include `file`, `file_path`, `filepath`, `filename`, `path`, `paths`, `target_file`, and `target_path`.
+
+In advisory mode, unresolved read paths become warnings. In hard-block mode, warnings can become blocking decisions.
+
+## Quick Start
+
 ```bash
-govctl init
+pnpm install
+pnpm build
+pnpm govctl init
+govctl mode show
+govctl audit head
+govctl audit verify
+govctl audit checkpoint
+govctl hook auto codex
+govctl hook auto claude
 ```
-This bootstraps the `.governance/` directory containing the default operating principles (constitution), rules (statutes), and event logs. It also generates `.claude/settings.json`, `.cursorrules`, `.clinerules`, and `.github/copilot-instructions.md` to ensure your editors are instantly synced.
 
-### Open a Case and Issue a Ticket
+`govctl init` wires Claude and Codex hooks to `govctl hook auto`, so products can switch adapters without changing the core governance engine.
+
+## Executable Architecture Decisions
+
+GovRuntime can promote important user decisions from chat memory into executable repo-local governance state:
+
+```text
+user statement -> evidence -> decision -> invariant or precedent -> ticket acceptance criteria -> Linear packet -> context pack / hook check
+```
+
+Useful commands:
+
 ```bash
-# Open a case
-govctl case create --title "Fix authorization timeout bug" --label AUTH-BUG
-
-# Issue a ticket with exit criteria
-govctl ticket create --area AUTH --seq 101 --title "JWT expiry config" --objective "Increase JWT expiry to 1 hour in auth handler" --criteria "JWT expires in 3600s"
+govctl evidence admit --quote "Reports must be generated section-by-section and assembled deterministically."
+govctl decision record --title "Sectioned report generation boundary" --scope "src/lib/reporting/**"
+govctl invariant create --name no-full-report-repair-in-sectioned-flow --decision DEC-...
+govctl pack install sectioned-generation
+govctl invariant check
+govctl linear packet --issue OB-1833
 ```
 
-### Create and Register a Branch
+Built-in packs include:
+
+- `long-term-architecture-correctness`
+- `sectioned-generation`
+- `report-quality-stage-ledger`
+- `linear-ops-standing-authorization`
+- `chrome-profile-routing`
+
+These packs are intentionally repo-local. The source of truth remains `.governance/`; skills and Markdown files are operator guidance, not authority.
+
+## Policy Configuration
+
+Builtin policy:
+
+```yaml
+engine: builtin
+mode: enforce
+```
+
+OPA policy:
+
+```yaml
+engine: opa
+entrypoint: data.govruntime.tool
+mode: enforce
+policy_dir: .governance/policies
+data_dir: .governance/policy_data
+```
+
+Expected behavior:
+
+- approved path: allow
+- forbidden path: block
+- outside intended scope: block unless explicit approval exists
+- destructive command: block unless explicit authorization exists
+- high-risk path: require human review, which blocks in enforce-mode hooks that do not represent review separately
+
+## Audit Ledger
+
+GovRuntime writes a local tamper-evident audit ledger at `.governance/audit/ledger.jsonl`.
+
+This is not immutable storage. A malicious actor with filesystem access can delete or regenerate local logs. Stronger assurance requires signed checkpoints and external anchoring.
+
+## Alpha Scope
+
+`alpha-0.1.1` is intended for local experimentation and product-integration feedback. It is not yet a stable hosted enforcement layer.
+
+Included:
+
+- `.governance` bootstrap templates
+- runtime mode config
+- Claude/Codex/generic hook normalization
+- advisory and hard-block decisions
+- clean-state JSONL audit trail
+- path literal validation
+- read-only MCP posture tools
+
+Not yet stable:
+
+- remote policy distribution
+- hosted dashboard APIs
+- signed audit logs
+- full Cursor adapter contract
+- production-grade schema migrations
+
+## Development
+
 ```bash
-govctl branch create --purpose "fix-jwt" --scope "src/auth/**"
-git checkout -b gov/CASE-AUTH-BUG/T-AUTH-101-R1/fix-jwt
+pnpm build
+pnpm test
 ```
 
----
+Tests use Node's built-in test runner against built package output, so run `pnpm build` before package-level tests.
 
-## 5. Killer Demo: Blocking Scope Drift
+## Positioning
 
-### Scenario
-A user asks a coding agent to fix a login bug.
+GovRuntime is best understood as:
 
-1.  **User**: *"Fix the login bug."*
-2.  **Agent**: Reads files under `src/auth/**`. (Allowed: inside scope).
-3.  **Agent**: Edits `src/auth/login.ts`. (Allowed: inside scope).
-4.  **Agent**: Attempts to write to `infra/deploy.tf` to update deployment scaling.
-5.  **GovRuntime (PreToolUse Hook)**: **Blocked.**
-    > *The active ticket is scoped to an auth bugfix.*  
-    > *infra/deploy.tf is outside the approved scope.*  
-    > *Infrastructure changes require explicit authorization.*
-6.  **Agent**: *"I must edit deploy.tf to ensure the deploy matches."* (Agent tries to self-justify).
-7.  **GovRuntime**: **Blocked.** (Agent reasoning is Tier 6 evidence and cannot override approved scope).
-8.  **User**: *"I explicitly approve expanding the ticket to include infra/deploy.tf."*
-9.  **GovRuntime**: Admits user quote as Tier 1 Evidence (User Confirmation), supersedes Ticket `R1` (SUPERSEDED), issues Ticket `R2` (Active) with expanded scope, and allows the write to `infra/deploy.tf`.
-
-Running `govctl timeline` prints the complete, auditable sequence of the entire session.
-
----
-
-## 6. Core Concepts
-*   **Constitution**: Top-level operating principles.
-*   **Statutes / Regulations**: Executable rules and runtime policies.
-*   **Precedents**: Reusable prior decisions.
-*   **Evidence**: Facts ranked by authority (Tier 1 User Quote down to Tier 6 Agent Inference).
-*   **Docket**: The append-only procedural event log.
-*   **Judgment**: The decision trace (Allow, Warn, Block).
-*   **Case**: The governed problem.
-*   **Ticket**: The authorized unit of work.
-*   **Branch**: The execution context.
-*   **Acceptance Criteria**: The exit condition.
-
----
-
-## 7. Architecture
-
-```
-Agent / Claude Code / Cursor
-        |
-        | hooks
-        v
-GovRuntime hook adapter (govctl hook)
-        |
-        v
-@govruntime/govd
-        |
-        | loads state, evaluates rules, records events
-        v
-.governance/
-        |
-        | exposes status
-        v
-govctl / read-only MCP server
+```text
+AI Agent Governance / Developer Tooling / Runtime Control Plane
 ```
 
----
+It is adjacent to CI, policy-as-code, MCP, and agent observability, but its core identity is execution governance for coding agents.
 
-## 8. CLI Reference
-*   `govctl init` — Bootstrap the governance repository structure.
-*   `govctl status` — Show the active case, ticket, branch, and current rules posture.
-*   `govctl why` — Inspect the docket and explain why the current task is active.
-*   `govctl timeline` — Print the ordered chronological event log for the current case.
-*   `govctl evidence admit` — Record explicit user statements or tool outputs as evidence.
-*   `govctl ticket reissue` — Supersede an active ticket with a new revision (e.g. R1 -> R2) to adjust scope.
+## License
 
----
-
-## 9. Hook Enforcement
-GovRuntime integrates natively into agent lifecycles via the `govctl hook` subcommands:
-*   `SessionStart`: Injects the **Procedural Context Pack** (active ticket and docket history) into the system prompt.
-*   `UserPromptSubmit`: Analyzes prompts for intent changes, reissuing tickets when user commands pivot.
-*   `PreToolUse`: Evaluates tool paths and arguments before they run.
-*   `Stop`: Inspects the timeline to verify that the active ticket's exit conditions are met.
-
----
-
-## 10. MCP Integration
-GovRuntime is not MCP. MCP is an interface protocol, whereas GovRuntime is a governance runtime.
-
-GovRuntime exposes its internal state through a read-only MCP server (`@govruntime/mcp-server`) with three tools:
-*   `gov_current_posture` — Returns the rendered Procedural Context Pack.
-*   `gov_current_ticket` — Returns the active ticket definition.
-*   `gov_why` — Returns the docket-derived reason for the current task.
-
----
-
-## 11. What GovRuntime Is Not
-*   **GovRuntime is not MCP**: It can use MCP as an integration surface, but it is not a protocol itself.
-*   **GovRuntime is not a generic guardrail**: It does not perform stateless input/output token filtering.
-*   **GovRuntime is not an agent framework**: It does not orchestrate agents or manage planning loops.
-*   **GovRuntime is not a prompt template system**: It dynamically checks and manages state on disk.
-*   **GovRuntime does not guarantee safety**: It reduces operational risks (scope drift, context loss) but does not replace secure sandboxing.
-*   **GovRuntime does not replace sandboxing, code review, secrets management, or human approval.**
-
----
-
-## 12. Current Limitations
-*   **Git-based Log Integrity**: Event log files (JSONL) are local and not cryptographically signed.
-*   **Hook Support**: Hard-blocking tool execution relies on the host agent client (e.g., Claude Code settings) invoking the hook adapter.
-*   **Advisory Mode in IDEs**: For tools like Cursor that do not expose lifecycle hooks, rule syncing is advisory (via rules files) rather than hard-blocked.
-*   **Manual Policies**: Core statutes and scopes must still be configured in YAML config files.
-
----
-
-## 13. Roadmap
-*   **Tamper-Evident Docket**: SHA-256 hash chaining for all JSONL docket event files.
-*   **Signed Judgments**: Cryptographic verification of allowed tool calls.
-*   **CI/CD PR Auditor**: GitHub Action that compares PR file diffs against the docket timeline to ensure zero out-of-scope edits were committed.
-*   **SIEM Export**: Log exporter for standard security information systems.
-*   **Interactive Jury System**: Central approval dashboard for human reviewers to approve ticket reissues.
-
----
-
-## 14. FAQ
-
-#### Q: How does GovRuntime differ from Open Policy Agent (OPA)?
-OPA determines if a static rule is violated. GovRuntime is specific to agent development workflows, tracking dynamic task states (tickets, cases, dockets, and evidence hierarchies) in the active code branch.
-
-#### Q: Does GovRuntime slow down tool execution?
-No. State parsing and evaluation are performed locally via fast YAML/JSONL parsing, typically executing in under 15ms.
-
-#### Q: Can I use GovRuntime without Claude Code?
-Yes. GovRuntime has a rules syncing engine (`syncAgentRules`) that writes to `.cursorrules`, `.clinerules`, and `.github/copilot-instructions.md` so that other AI tools (Cursor, Cline, Copilot) automatically receive the dynamic ticketing and scope posture.
+Apache-2.0. See `LICENSE`.

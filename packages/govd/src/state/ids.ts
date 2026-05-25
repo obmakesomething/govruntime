@@ -56,6 +56,14 @@ export function newPrecedentId(seq: number): string {
   return `P-${String(seq).padStart(3, "0")}`;
 }
 
+export function newDecisionId(): string {
+  return `DEC-${dateSegment()}-${nextSeq("DEC")}`;
+}
+
+export function newInvariantId(): string {
+  return `INV-${dateSegment()}-${nextSeq("INV")}`;
+}
+
 export function nowISO(): string {
   return new Date().toISOString();
 }

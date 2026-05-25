@@ -1,13 +1,34 @@
 # @govruntime/govd
 
-Core library for GovRuntime, the procedural governance runtime for AI coding agents.
+Core governance engine for GovRuntime.
 
-This package contains the core business logic, engines, and handlers:
-*   **State Loader & Writer**: Parses and updates `.governance/` YAML config files and JSONL event logs.
-*   **Evidence Registry**: Admits and tiers evidence based on authority levels.
-*   **Docket Recorder**: Maintains the chronological timeline of events.
-*   **Intent Analyzer**: Classifies prompt intent changes (e.g. continue, refine, deepen, pivot).
-*   **Conflict Detector**: Scans for glob path violations and rule conflicts.
-*   **Judgment Engine**: Applies policy rules (statutes) to output allow/warn/block judgments.
-*   **Context Pack Renderer**: Formats the dynamic markdown injected into agent prompts.
-*   **Hook Handlers**: The underlying logic for agent lifecycle hooks.
+`govd` owns policy judgment and `.governance/` state. It is intentionally platform-neutral: Claude, Codex, Cursor, MCP clients, and future products should all call into the same core runtime instead of re-implementing governance decisions.
+
+## Responsibilities
+
+- Load `.governance/` YAML and JSONL state.
+- Resolve active case, ticket, branch, statutes, regulations, and precedents.
+- Judge tool calls as allow, warn, require human review, or block.
+- Validate document and tool-input path literals.
+- Record docket, audit, judgment, evidence, simulation, and clean-state events.
+- Render the Procedural Context Pack for agent prompt injection.
+
+## Public APIs
+
+Common entrypoints include:
+
+```ts
+loadState(cwd)
+judgeToolCall(event, state)
+handlePreToolUse(event, state)
+handleStop(event, state)
+validateHookPathLiterals(event, state)
+validateDocumentPathLiterals(markdown, state)
+renderContextPack(state)
+```
+
+## Design Boundary
+
+`govd` is not an agent framework and does not own platform-specific hook protocols.
+
+Platform-specific behavior belongs in `@govruntime/govctl` adapters. Governance decisions belong here.

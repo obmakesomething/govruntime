@@ -18,15 +18,43 @@ import type {
   DocketEvent,
   Evidence,
   BranchEntry,
+  ArchitectureDecision,
+  ArchitectureInvariant,
+  RuntimeConfig,
+  RuntimeEnforcementMode,
+  RuntimeProductMode,
 } from "./types.js";
 
 const GOVERNANCE_DIR = ".governance";
+
+export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  namespace: "@govruntime",
+  product_mode: "development",
+  enforcement_mode: "advisory",
+  clean_state_log: "audit/clean_state.jsonl",
+  path_validation: {
+    enabled: true,
+    check_tool_inputs: true,
+    check_document_literals: true,
+    block_missing_existing_paths_in_hard_mode: true,
+    path_keys: [
+      "file",
+      "file_path",
+      "filepath",
+      "filename",
+      "path",
+      "paths",
+      "target_file",
+      "target_path",
+    ],
+  },
+};
 
 function govPath(cwd: string, ...parts: string[]): string {
   return path.join(cwd, GOVERNANCE_DIR, ...parts);
 }
 
-function readYamlFile<T>(filePath: string): T | null {
+function readYamlFile<T = any>(filePath: string): T | null {
   try {
     const raw = fs.readFileSync(filePath, "utf8");
     return yaml.load(raw) as T;
@@ -35,7 +63,7 @@ function readYamlFile<T>(filePath: string): T | null {
   }
 }
 
-function readJsonlFile<T>(filePath: string): T[] {
+function readJsonlFile<T = any>(filePath: string): T[] {
   try {
     const raw = fs.readFileSync(filePath, "utf8");
     return raw
@@ -146,6 +174,38 @@ function findActiveBranch(
   );
 }
 
+function normalizeProductMode(value: unknown): RuntimeProductMode {
+  return value === "production" ? "production" : "development";
+}
+
+function normalizeEnforcementMode(value: unknown): RuntimeEnforcementMode {
+  return value === "hard-block" ? "hard-block" : "advisory";
+}
+
+function loadRuntimeConfig(constitution: ConstitutionConfig | null): RuntimeConfig {
+  const runtime = constitution?.runtime ?? {};
+  const pathValidation = (runtime.path_validation ?? {}) as Partial<RuntimeConfig["path_validation"]>;
+
+  return {
+    ...DEFAULT_RUNTIME_CONFIG,
+    product_mode: normalizeProductMode(runtime.product_mode),
+    enforcement_mode: normalizeEnforcementMode(
+      process.env["GOVRUNTIME_ENFORCEMENT_MODE"] ?? runtime.enforcement_mode
+    ),
+    clean_state_log:
+      typeof runtime.clean_state_log === "string"
+        ? runtime.clean_state_log
+        : DEFAULT_RUNTIME_CONFIG.clean_state_log,
+    path_validation: {
+      ...DEFAULT_RUNTIME_CONFIG.path_validation,
+      ...pathValidation,
+      path_keys: Array.isArray(pathValidation.path_keys)
+        ? pathValidation.path_keys
+        : DEFAULT_RUNTIME_CONFIG.path_validation.path_keys,
+    },
+  };
+}
+
 export function loadState(cwd: string): GovernanceState {
   const governanceDir = govPath(cwd);
 
@@ -158,6 +218,8 @@ export function loadState(cwd: string): GovernanceState {
 
   const cases = readAllYamlFiles<Case>(govPath(cwd, "cases"));
   const tickets = readAllYamlFiles<Ticket>(govPath(cwd, "tickets"));
+  const decisions = readAllYamlFiles<ArchitectureDecision>(govPath(cwd, "decisions"));
+  const invariants = readAllYamlFiles<ArchitectureInvariant>(govPath(cwd, "invariants"));
   const activePrecedents = readAllYamlFiles<Precedent>(
     govPath(cwd, "precedents", "active")
   );
@@ -174,16 +236,20 @@ export function loadState(cwd: string): GovernanceState {
   const activeCase = findActiveCase(cases);
   const activeTicket = findActiveTicket(tickets, activeCase);
   const activeBranch = findActiveBranch(branchLedger, activeTicket);
+  const runtimeConfig = loadRuntimeConfig(constitution);
 
   return {
     cwd,
     governance_dir: governanceDir,
+    runtime_config: runtimeConfig,
     constitution,
     statutes,
     regulations,
     cases,
     tickets,
     precedents,
+    decisions,
+    invariants,
     branch_ledger: branchLedger,
     active_case: activeCase,
     active_ticket: activeTicket,

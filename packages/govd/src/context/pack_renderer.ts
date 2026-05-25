@@ -116,6 +116,32 @@ export function renderContextPack(state: GovernanceState): string {
     lines.push("");
   }
 
+  // --- Active Decisions / Invariants ---
+  const activeDecisions = state.decisions.filter((decision) => decision.status === "active").slice(-5);
+  const activeInvariants = state.invariants.filter((invariant) => invariant.status === "active").slice(-5);
+  if (activeDecisions.length > 0 || activeInvariants.length > 0) {
+    lines.push("### Active Architecture Decisions / Invariants");
+    for (const decision of activeDecisions) {
+      lines.push(`- **Decision** \`${decision.decision_id}\`: ${decision.title}`);
+      if (decision.scope.length > 0) {
+        lines.push(`  - Scope: ${decision.scope.join(", ")}`);
+      }
+    }
+    for (const invariant of activeInvariants) {
+      lines.push(`- **Invariant** \`${invariant.invariant_id}\`: ${invariant.title}`);
+      for (const rule of invariant.rule.slice(0, 3)) {
+        lines.push(`  - ${rule}`);
+      }
+      if (invariant.required_ticket_acceptance_criteria.length > 0) {
+        lines.push("  - Required acceptance criteria:");
+        for (const criterion of invariant.required_ticket_acceptance_criteria.slice(0, 4)) {
+          lines.push(`    - ${criterion}`);
+        }
+      }
+    }
+    lines.push("");
+  }
+
   // --- Recent Docket Activity ---
   const recentDocket = getRecentDocketEvents(state, 5);
   if (recentDocket.length > 0) {

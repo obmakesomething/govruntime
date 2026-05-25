@@ -2,12 +2,37 @@
 
 ## Reporting a Vulnerability
 
-We take the security of GovRuntime seriously. If you find a security vulnerability, please do not report it in the public issue tracker. Instead, please report it via email to security@govruntime.org (or open a private security advisory on GitHub).
+We take the security of GovRuntime seriously. Please do not report security vulnerabilities in the public issue tracker.
 
-We will acknowledge your report within 48 hours and provide a detailed timeline for addressing the issue.
+Preferred reporting paths:
 
-Please include the following information in your report:
-*   Detailed steps to reproduce the vulnerability.
-*   A proof-of-concept (PoC) script or execution timeline.
-*   The version of GovRuntime and the agent host client (e.g., Claude Code, Codex).
-*   Any configuration details or custom policies applied.
+- Open a private security advisory on GitHub.
+- If a private advisory is not available, contact the maintainers through the repository owner profile.
+
+Please include:
+
+- Detailed steps to reproduce the vulnerability.
+- A proof-of-concept script, payload, or execution timeline when safe to share.
+- The affected GovRuntime version.
+- The agent host involved, such as Codex, Claude Code, Cursor, or a custom adapter.
+- Relevant `.governance/` configuration, with secrets removed.
+- Whether the issue affects advisory mode, hard-block mode, MCP tools, or package publication.
+
+## Scope
+
+Security-sensitive areas include:
+
+- hook adapter input/output handling
+- command execution boundaries
+- path literal validation
+- `.governance/` state mutation
+- audit log integrity
+- MCP tool exposure
+- package release workflows
+- secrets or credential handling
+
+## Safety Expectations
+
+Do not include real secrets, private keys, tokens, browser session dumps, or private customer data in reports. Redacted fixtures are strongly preferred.
+
+GovRuntime is currently alpha software. Hard-block mode should be trialed in isolated repositories or CI before production use.
