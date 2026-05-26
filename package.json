@@ -1,7 +1,7 @@
 {
   "name": "govruntime",
-  "version": "0.1.0-alpha.0",
-  "description": "Execution governance for coding agents.",
+  "version": "0.1.2-alpha",
+  "description": "Open-source control plane for AI coding-agent governance.",
   "private": true,
   "scripts": {
     "build": "pnpm -r run build",
@@ -9,11 +9,35 @@
     "test": "pnpm -r run test --if-present",
     "dev": "pnpm -r run dev --if-present",
     "lint": "pnpm -r run lint --if-present",
-    "govctl": "node packages/govctl/dist/index.js"
+    "govctl": "node packages/govctl/dist/index.js",
+    "gov": "node packages/govctl/dist/gov.js"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "author": "GovRuntime Contributors",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obmakesomething/govruntime.git"
+  },
+  "homepage": "https://github.com/obmakesomething/govruntime#readme",
+  "bugs": {
+    "url": "https://github.com/obmakesomething/govruntime/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "agent-governance",
+    "ai-governance",
+    "developer-tools",
+    "control-plane",
+    "runtime",
+    "policy-as-code",
+    "audit-log",
+    "codex",
+    "claude-code",
+    "cursor",
+    "mcp"
+  ]
 }

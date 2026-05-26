@@ -10,7 +10,7 @@
 import type { GovernanceState, HookDecision } from "../state/types.js";
 import { renderContextPack, syncAgentRules } from "../context/pack_renderer.js";
 import { recordSessionStarted } from "../docket/recorder.js";
-import { appendAuditEvent } from "../state/writer.js";
+import { appendAuditEvent, appendCleanStateEvent } from "../state/writer.js";
 import { nowISO } from "../state/ids.js";
 
 export function handleSessionStart(state: GovernanceState): HookDecision {
@@ -29,6 +29,18 @@ export function handleSessionStart(state: GovernanceState): HookDecision {
     case_id: state.active_case?.case_id,
     ticket_id: state.active_ticket?.ticket_id,
     branch: state.active_branch?.branch,
+    created_at: nowISO(),
+  });
+
+  appendCleanStateEvent(state.cwd, {
+    phase: "run-task",
+    event: "session_started",
+    mode: state.runtime_config.enforcement_mode,
+    product_mode: state.runtime_config.product_mode,
+    case_id: state.active_case?.case_id,
+    ticket_id: state.active_ticket?.ticket_id,
+    branch: state.active_branch?.branch,
+    clean: Boolean(state.active_case && state.active_ticket),
     created_at: nowISO(),
   });
 

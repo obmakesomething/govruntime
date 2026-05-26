@@ -1,7 +1,7 @@
 {
   "name": "@govruntime/mcp-server",
-  "version": "0.1.0",
-  "description": "AI Legal Governance Runtime — MCP Server (read-only Phase 1)",
+  "version": "0.1.2-alpha",
+  "description": "Read-only MCP server for GovRuntime governance posture.",
   "type": "module",
   "bin": {
     "gov-mcp": "./dist/index.js"
@@ -19,5 +19,36 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obmakesomething/govruntime.git"
+  },
+  "homepage": "https://github.com/obmakesomething/govruntime#readme",
+  "bugs": {
+    "url": "https://github.com/obmakesomething/govruntime/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "agent-governance",
+    "ai-governance",
+    "developer-tools",
+    "control-plane",
+    "runtime",
+    "policy-as-code",
+    "audit-log",
+    "codex",
+    "claude-code",
+    "cursor",
+    "mcp"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,41 +1,59 @@
 # Model Context Protocol (MCP) Integration
 
-This document outlines how GovRuntime integrates with and utilizes the Model Context Protocol.
+MCP is an integration surface for GovRuntime, not the product identity.
 
----
+GovRuntime is the execution governance control plane. The MCP server exposes read-only governance posture so compatible agents and products can inspect current scope, ticket state, and docket-derived reasoning.
 
-## MCP is an Integration Surface, Not the Identity
+## Package
 
-GovRuntime is not an MCP server itself; MCP is simply one interface it provides. GovRuntime's core engine evaluates execution scopes, manages tickets, and enforces runtime hooks.
+```text
+@govruntime/mcp-server
+```
 
-Exposing this state via an MCP server allows agents to actively query their constraints during tool execution.
+## Available Tools
 
----
+### `gov_current_posture`
 
-## `@govruntime/mcp-server`
+Returns the rendered Procedural Context Pack in Markdown format.
 
-The server provides three read-only tools:
+Includes:
 
-### 1. `gov_current_posture`
-Returns the rendered **Procedural Context Pack** in Markdown format. This contains:
-*   Active case details.
-*   Active ticket objectives and acceptance criteria.
-*   The current branch and its allowed file scope.
-*   Recent docket history events.
-*   The next expected action.
+- active case details
+- active ticket objective and acceptance criteria
+- current branch and allowed file scope
+- recent docket history
+- next expected action
 
-### 2. `gov_current_ticket`
-Returns the complete YAML structure of the active ticket. Useful for agents that parse structured goals.
+### `gov_current_ticket`
 
-### 3. `gov_why`
-Returns the docket-derived origin and evolution of the current work stream, helping the agent understand *why* it is being asked to run a task.
+Returns the active ticket as structured JSON.
 
----
+Useful for products or agents that need machine-readable objective, acceptance criteria, non-goals, risk profile, and verification plan.
 
-## Configuration in Claude Code
+### `gov_why`
 
-To add GovRuntime's MCP server to Claude Code, edit your global settings file or add it using:
+Returns a docket-derived explanation of why the current work exists.
+
+This is built from procedural events, not model inference.
+
+## Claude Code Example
+
+After building the repo, add the MCP server to Claude Code with a path to the built package:
+
 ```bash
 claude mcp add govruntime node /path/to/govruntime/packages/mcp-server/dist/index.js
 ```
-This allows Claude Code to fetch the governance posture dynamically.
+
+## Product Guidance
+
+Use MCP when the agent needs to query governance state during execution.
+
+Use lifecycle hooks when the product needs enforcement decisions such as allow, warn, or block.
+
+Recommended shape:
+
+```text
+hooks: enforcement path
+MCP: read-only context path
+.govruntime/.governance files: source of procedural truth
+```
