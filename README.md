@@ -6,8 +6,10 @@ Give Codex, Claude Code, Cursor, and future coding agents a shared runtime for s
 
 > Git tracks the diff. GovRuntime tracks the mandate.
 
-Status: `0.1.2-alpha.0`  
-Release channel: `alpha-0.1.2`  
+Status: `0.1.2-alpha`
+
+Release channel: `alpha-0.1.2`
+
 License: Apache-2.0
 
 ## Why this exists
@@ -40,7 +42,7 @@ CI checks what changed. GovRuntime governs how the change happened.
 ## Packages
 
 - `@govruntime/govd`: core governance engine. Loads `.governance/*`, judges tool use, records docket/audit events, validates path literals, and renders context packs.
-- `@govruntime/govctl`: CLI and platform adapter layer. Provides `init`, `status`, `mode`, `case`, `ticket`, `branch`, `evidence`, `timeline`, `why`, and `hook`.
+- `@govruntime/govctl`: CLI and platform adapter layer. Provides `govctl` commands for repo posture and hook routing, plus the `gov` case runtime for long-running work governance.
 - `@govruntime/mcp-server`: read-only MCP server for current posture, active ticket, and docket-derived why.
 
 ## Product Shape
@@ -110,6 +112,54 @@ govctl hook auto claude
 
 `govctl init` wires Claude and Codex hooks to `govctl hook auto`, so products can switch adapters without changing the core governance engine.
 
+## Long-Running Work Governance
+
+`gov` is the minimal case-scoped control-plane CLI for long-running agent work. It is designed for cases where state can diverge across chat, repo, artifacts, Linear, browser/account context, provider calls, governance files, and latest user intent.
+
+The source of truth is a case folder under:
+
+```text
+.governance/cases/<case_id>/
+```
+
+The flow is:
+
+```text
+append-only events
+  -> generated governance state
+  -> generated context pack
+  -> pre-tool checks / validators / Linear packet
+```
+
+Useful commands:
+
+```bash
+pnpm gov -- init --case pipeline3
+pnpm gov -- record-event --case pipeline3 --type validator_result --message "validator passed" --evidence validator#sha256:...
+pnpm gov -- record-run --case pipeline3 --run run-001 --manifest run-manifest.json
+pnpm gov -- record-stage --case pipeline3 --run run-001 --section intro --stage provider_raw_output --input prompt.md --output raw.md
+pnpm gov -- finalize-run --case pipeline3 --run run-001 --artifact-hash <sha256>
+pnpm gov -- check --case pipeline3 --before-tool review-submit --payload payload.json
+pnpm gov -- close-gate --case pipeline3 --gate release_approval --approval approval.json
+pnpm gov -- context-pack --case pipeline3
+pnpm gov -- sync-linear --case pipeline3
+```
+
+`gov` creates generated files that should not be edited manually:
+
+- `state.generated.json`
+- `context_pack.generated.md`
+- `linear_packet.generated.md`
+
+It also keeps append-only evidence streams:
+
+- `events.jsonl`
+- `runs/<run_id>/stage_ledger.jsonl`
+
+Current hard blocks include full-report repair, GPT Pro review without fresh profile evidence, human-gated release/deploy/payment/credential actions, stale artifact review packets, deterministic Korean prose replacement, and unsupported release-ready or acceptance claims.
+
+Machine gates and required stage coverage are configurable in `gates.yaml`. Human gates require signed `L5` approval artifacts.
+
 ## Executable Architecture Decisions
 
 GovRuntime can promote important user decisions from chat memory into executable repo-local governance state:
@@ -174,7 +224,7 @@ This is not immutable storage. A malicious actor with filesystem access can dele
 
 ## Alpha Scope
 
-`alpha-0.1.1` is intended for local experimentation and product-integration feedback. It is not yet a stable hosted enforcement layer.
+`alpha-0.1.2` is intended for local experimentation, product-integration feedback, and case-scoped long-running work governance. It is not yet a stable hosted enforcement layer.
 
 Included:
 
@@ -184,6 +234,9 @@ Included:
 - advisory and hard-block decisions
 - clean-state JSONL audit trail
 - path literal validation
+- case-scoped `gov` CLI for long-running work
+- generated context packs and Linear packets from append-only case evidence
+- stage ledger tracing, configurable stage coverage, configurable machine gates, and signed human gate closure
 - read-only MCP posture tools
 
 Not yet stable:
@@ -191,6 +244,7 @@ Not yet stable:
 - remote policy distribution
 - hosted dashboard APIs
 - signed audit logs
+- signed human approval verification beyond local artifact structure
 - full Cursor adapter contract
 - production-grade schema migrations
 

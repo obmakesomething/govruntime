@@ -24,6 +24,6 @@ node packages/mcp-server/dist/index.js
 
 ## Boundary
 
-MCP is a read-only context surface in `alpha-0.1.1`.
+MCP is a read-only context surface in `alpha-0.1.2`.
 
 Use `govctl hook auto` for enforcement decisions.

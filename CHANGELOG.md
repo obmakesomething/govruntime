@@ -2,6 +2,25 @@
 
 All notable changes to GovRuntime are documented here.
 
+## [0.1.2-alpha] - 2026-05-26
+
+### Added
+
+- Added the `gov` case-scoped CLI for long-running agent-work governance.
+- Added `.governance/cases/<case_id>/` case folders with `case.yaml`, `decisions.yaml`, `invariants.yaml`, `gates.yaml`, append-only `events.jsonl`, generated state, generated context packs, generated Linear packets, and run ledgers.
+- Added `gov init`, `status`, `record-event`, `generate-state`, `context-pack`, `check`, `record-run`, `record-stage`, `trace`, `sync-linear`, `finalize-run`, and `close-gate`.
+- Added pre-tool hard blocks for full-report repair, GPT Pro review without fresh profile evidence, human-gated release/deploy/payment/secret actions, stale artifact review packets, deterministic Korean prose replacement, and unsupported release-ready or acceptance claims.
+- Added stage ledger recording with input/output hashes, redacted excerpts, allowed stage names, and section lineage tracing.
+- Added `finalize-run` to enforce configurable stage coverage before marking artifacts fresh.
+- Added configurable machine gate rules in `gates.yaml`.
+- Added signed `L5` approval artifact requirements for human gate closure.
+- Added smoke coverage for the new CLI and gate behavior.
+
+### Changed
+
+- Updated package metadata to version `0.1.2-alpha`.
+- Updated the root README and `@govruntime/govctl` README for the new long-running work governance flow.
+
 ## [0.1.2-alpha.0] - 2026-05-25
 
 ### Added

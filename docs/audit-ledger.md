@@ -32,7 +32,7 @@ The local ledger is tamper-evident, not tamper-proof.
 
 A malicious actor with filesystem access can delete, truncate, or regenerate local logs. GovRuntime can detect many accidental or unsophisticated modifications when `govctl audit verify` is run, but local files alone are not enterprise-grade integrity.
 
-Stronger assurance requires signed checkpoints and external anchoring. GovRuntime includes extension points for anchoring providers, but `alpha-0.1.1` does not fake signatures or claim immutable storage.
+Stronger assurance requires signed checkpoints and external anchoring. GovRuntime includes extension points for anchoring providers, but `alpha-0.1.2` does not fake signatures or claim immutable storage.
 
 ## Commands
 
