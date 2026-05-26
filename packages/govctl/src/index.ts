@@ -25,7 +25,7 @@ const program = new Command();
 program
   .name("govctl")
   .description("AI Legal Governance Runtime — governance control CLI")
-  .version("0.1.1-alpha.0");
+  .version("0.1.2-alpha");
 
 registerInit(program);
 registerStatus(program);

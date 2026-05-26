@@ -1,10 +1,11 @@
 {
   "name": "@govruntime/govctl",
-  "version": "0.1.2-alpha.0",
+  "version": "0.1.2-alpha",
   "description": "CLI and hook adapter layer for AI coding-agent governance.",
   "type": "module",
   "bin": {
-    "govctl": "./dist/index.js"
+    "govctl": "./dist/index.js",
+    "gov": "./dist/gov.js"
   },
   "main": "./dist/index.js",
   "scripts": {

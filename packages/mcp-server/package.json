@@ -1,6 +1,6 @@
 {
   "name": "@govruntime/mcp-server",
-  "version": "0.1.2-alpha.0",
+  "version": "0.1.2-alpha",
   "description": "Read-only MCP server for GovRuntime governance posture.",
   "type": "module",
   "bin": {
