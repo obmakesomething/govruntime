@@ -39,5 +39,8 @@
     "claude-code",
     "cursor",
     "mcp"
-  ]
+  ],
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
 }
