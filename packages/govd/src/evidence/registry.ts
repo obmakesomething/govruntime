@@ -56,7 +56,7 @@ export function admitEvidence(
   opts: AdmitEvidenceOptions
 ): Evidence {
   const evidence: Evidence = {
-    evidence_id: newEvidenceId(),
+    evidence_id: newEvidenceId(cwd),
     type: opts.type,
     tier: TIER_MAP[opts.type],
     source: opts.source,

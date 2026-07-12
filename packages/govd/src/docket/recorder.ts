@@ -39,7 +39,7 @@ export function recordDocketEvent(
   opts: RecordDocketEventOptions
 ): DocketEvent {
   const event: DocketEvent = {
-    event_id: newDocketEventId(),
+    event_id: newDocketEventId(cwd),
     case_id: opts.case_id,
     ticket_id: opts.ticket_id,
     event_type: opts.event_type,

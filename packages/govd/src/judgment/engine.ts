@@ -57,7 +57,7 @@ export function judgeToolCall(event: NormalizedHookEvent, state: GovernanceState
   }
 
   const judgment: Judgment = {
-    judgment_id: newJudgmentId(),
+    judgment_id: newJudgmentId(state.cwd),
     case_id: active_case?.case_id ?? "NO_ACTIVE_CASE",
     ticket_id: active_ticket?.ticket_id,
     decision,
@@ -98,7 +98,7 @@ export function judgeCompletion(state: GovernanceState): Judgment {
 
 function makeQuickJudgment(state: GovernanceState, decision: JudgmentDecision, reason: string, orders: JudgmentOrder[]): Judgment {
   const j: Judgment = {
-    judgment_id: newJudgmentId(),
+    judgment_id: newJudgmentId(state.cwd),
     case_id: state.active_case?.case_id ?? "NO_ACTIVE_CASE",
     ticket_id: state.active_ticket?.ticket_id,
     decision,

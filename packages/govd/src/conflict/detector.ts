@@ -24,7 +24,8 @@ import { newConflictId, nowISO } from "../state/ids.js";
 export function detectBranchScopeConflict(
   targetPath: string,
   activeBranch: BranchEntry | null,
-  activeCase: Case | null
+  activeCase: Case | null,
+  cwd: string = process.cwd(),
 ): Conflict | null {
   if (!activeBranch || !activeCase) return null;
 
@@ -41,7 +42,7 @@ export function detectBranchScopeConflict(
         new_state: `Tool targets forbidden path: ${targetPath}`,
         requires_user_confirmation: true,
         evidence: [],
-      });
+      }, cwd);
     }
   }
 
@@ -59,7 +60,7 @@ export function detectBranchScopeConflict(
         new_state: `Tool targets out-of-scope path: ${targetPath}`,
         requires_user_confirmation: false, // warn only in Phase 1
         evidence: [],
-      });
+      }, cwd);
     }
   }
 
@@ -72,7 +73,8 @@ export function detectBranchScopeConflict(
 
 export function detectPolicyViolation(
   targetPath: string,
-  regulations: Record<string, unknown>
+  regulations: Record<string, unknown>,
+  cwd: string = process.cwd(),
 ): Conflict | null {
   const repoPolicy = regulations["repo_policy"] as
     | {
@@ -97,7 +99,7 @@ export function detectPolicyViolation(
         new_state: `Agent attempted to edit high-risk path without explicit authorization.`,
         requires_user_confirmation: true,
         evidence: [],
-      });
+      }, cwd);
     }
   }
 
@@ -110,7 +112,8 @@ export function detectPolicyViolation(
 
 export function detectMissingGovernanceContext(
   activeCase: Case | null,
-  activeTicket: Ticket | null
+  activeTicket: Ticket | null,
+  cwd: string = process.cwd(),
 ): Conflict[] {
   const conflicts: Conflict[] = [];
   const caseId = activeCase?.case_id ?? "NO_ACTIVE_CASE";
@@ -124,7 +127,7 @@ export function detectMissingGovernanceContext(
         new_state: "Agent attempting to execute without an active case.",
         requires_user_confirmation: false,
         evidence: [],
-      })
+      }, cwd)
     );
   }
 
@@ -137,7 +140,7 @@ export function detectMissingGovernanceContext(
         new_state: "Agent attempting to execute without an active ticket.",
         requires_user_confirmation: false,
         evidence: [],
-      })
+      }, cwd)
     );
   }
 
@@ -158,9 +161,9 @@ interface MakeConflictOpts {
   evidence: EvidenceId[];
 }
 
-function makeConflict(opts: MakeConflictOpts): Conflict {
+function makeConflict(opts: MakeConflictOpts, cwd: string): Conflict {
   return {
-    conflict_id: newConflictId() as ConflictId,
+    conflict_id: newConflictId(cwd) as ConflictId,
     case_id: opts.case_id,
     ticket_id: opts.ticket_id,
     type: opts.type,

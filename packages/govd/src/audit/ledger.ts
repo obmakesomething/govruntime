@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { canonicalJson, sha256Canonical } from "./canonical.js";
+import { withFileLock } from "../state/file_lock.js";
 import type {
   AuditCheckpoint,
   AuditContext,
@@ -58,40 +59,43 @@ export function appendLedgerRecord<T>(
   payload: T,
   context: AuditContext = {}
 ): AuditEnvelope<T> {
-  fs.mkdirSync(auditDir(cwd), { recursive: true });
-  const head = readAuditHead(cwd);
-  const createdAt = context.created_at ?? new Date().toISOString();
-  const payloadHash = sha256Canonical(payload);
-  const envelopeWithoutHash = omitUndefined({
-    version: "gr.audit.v1" as const,
-    seq: head.last_seq + 1,
-    stream,
-    record_id: recordId,
-    prev_hash: head.last_hash,
-    payload_hash: payloadHash,
-    payload,
-    case_id: context.case_id,
-    ticket_id: context.ticket_id,
-    session_id: context.session_id,
-    actor: context.actor ?? "system",
-    git_head: context.git_head ?? readGitHead(cwd),
-    created_at: createdAt,
-  });
-  const entryHash = sha256Canonical(envelopeWithoutHash);
-  const envelope = {
-    ...envelopeWithoutHash,
-    entry_hash: entryHash,
-  } as AuditEnvelope<T>;
+  const lockPath = path.join(auditDir(cwd), ".locks", "ledger.lock");
+  return withFileLock(lockPath, () => {
+    fs.mkdirSync(auditDir(cwd), { recursive: true });
+    const head = readAuditHead(cwd);
+    const createdAt = context.created_at ?? new Date().toISOString();
+    const payloadHash = sha256Canonical(payload);
+    const envelopeWithoutHash = omitUndefined({
+      version: "gr.audit.v1" as const,
+      seq: head.last_seq + 1,
+      stream,
+      record_id: recordId,
+      prev_hash: head.last_hash,
+      payload_hash: payloadHash,
+      payload,
+      case_id: context.case_id,
+      ticket_id: context.ticket_id,
+      session_id: context.session_id,
+      actor: context.actor ?? "system",
+      git_head: context.git_head ?? readGitHead(cwd),
+      created_at: createdAt,
+    });
+    const entryHash = sha256Canonical(envelopeWithoutHash);
+    const envelope = {
+      ...envelopeWithoutHash,
+      entry_hash: entryHash,
+    } as AuditEnvelope<T>;
 
-  fs.appendFileSync(ledgerPath(cwd), canonicalJson(envelope) + "\n", "utf8");
-  writeAuditHead(cwd, {
-    version: "gr.audit.head.v1",
-    last_seq: envelope.seq,
-    last_hash: envelope.entry_hash,
-    updated_at: createdAt,
-  });
+    fs.appendFileSync(ledgerPath(cwd), canonicalJson(envelope) + "\n", "utf8");
+    writeAuditHead(cwd, {
+      version: "gr.audit.head.v1",
+      last_seq: envelope.seq,
+      last_hash: envelope.entry_hash,
+      updated_at: createdAt,
+    });
 
-  return envelope;
+    return envelope;
+  });
 }
 
 export function readLedger(cwd: string): AuditEnvelope[] {
