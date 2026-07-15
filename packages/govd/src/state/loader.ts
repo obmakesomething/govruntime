@@ -7,6 +7,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import yaml from "js-yaml";
 import type {
   GovernanceState,
@@ -28,6 +29,19 @@ import type {
 const GOVERNANCE_DIR = ".governance";
 const EPOCH_TIMESTAMP = new Date(0).toISOString();
 const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))?)?$/;
+
+export type SourceReadOutcome = "loaded" | "invalid" | "missing";
+
+export interface SourceReadTrace {
+  path: string;
+  outcome: SourceReadOutcome;
+  fingerprint: string | null;
+}
+
+export interface LoadStateOptions {
+  /** Called once per attempted source read. Observer exceptions propagate unchanged to the caller. */
+  onSourceRead?: (event: SourceReadTrace) => void;
+}
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   namespace: "@govruntime",
@@ -57,14 +71,51 @@ function govPath(cwd: string, ...parts: string[]): string {
 }
 
 function readYamlFile<T = any>(filePath: string): T | null {
+  return readStructuredFile<T>(filePath);
+}
+
+function readStructuredFile<T = any>(
+  filePath: string,
+  trace?: { path: string; observer: (event: SourceReadTrace) => void }
+): T | null {
+  let bytes: Buffer;
   try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    return path.extname(filePath).toLowerCase() === ".json"
-      ? JSON.parse(raw) as T
-      : yaml.load(raw) as T;
+    bytes = fs.readFileSync(filePath);
   } catch {
+    trace?.observer({ path: trace.path, outcome: "missing", fingerprint: null });
     return null;
   }
+
+  const fingerprint = trace ? fingerprintBytes(bytes) : null;
+  let value: T | null;
+  let outcome: SourceReadOutcome;
+  try {
+    const raw = bytes.toString("utf8");
+    value = path.extname(filePath).toLowerCase() === ".json"
+      ? JSON.parse(raw) as T
+      : yaml.load(raw) as T;
+    outcome = value == null ? "invalid" : "loaded";
+  } catch {
+    value = null;
+    outcome = "invalid";
+  }
+  trace?.observer({ path: trace.path, outcome, fingerprint });
+  return value;
+}
+
+function readGovernanceSource<T>(
+  cwd: string,
+  relativePath: string,
+  observer?: (event: SourceReadTrace) => void
+): T | null {
+  return readStructuredFile<T>(
+    govPath(cwd, ...relativePath.split("/")),
+    observer ? { path: relativePath, observer } : undefined
+  );
+}
+
+function fingerprintBytes(bytes: Buffer): string {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 function readJsonlFile<T = any>(filePath: string): T[] {
@@ -95,57 +146,65 @@ function readAllYamlFiles<T>(dirPath: string): T[] {
   }
 }
 
-function readAllStructuredFiles<T>(dirPath: string): T[] {
+function readAllStructuredFiles<T>(
+  cwd: string,
+  relativeDirectory: string,
+  observer?: (event: SourceReadTrace) => void
+): T[] {
+  const dirPath = govPath(cwd, ...relativeDirectory.split("/"));
+  let entries: string[];
   try {
-    const entries = fs.readdirSync(dirPath).sort((a, b) => {
+    entries = fs.readdirSync(dirPath).sort((a, b) => {
       const priority = (entry: string) => entry.endsWith(".yaml") || entry.endsWith(".yml") ? 0 : 1;
       return priority(a) - priority(b) || a.localeCompare(b);
     });
-    const results: T[] = [];
-    for (const entry of entries) {
-      if (entry.endsWith(".yaml") || entry.endsWith(".yml") || entry.endsWith(".json")) {
-        const obj = readYamlFile<T>(path.join(dirPath, entry));
-        if (obj) results.push(obj);
-      }
-    }
-    return results;
   } catch {
     return [];
   }
+  const results: T[] = [];
+  for (const entry of entries) {
+    if (entry.endsWith(".yaml") || entry.endsWith(".yml") || entry.endsWith(".json")) {
+      const obj = readGovernanceSource<T>(cwd, `${relativeDirectory}/${entry}`, observer);
+      if (obj) results.push(obj);
+    }
+  }
+  return results;
 }
 
-function readAllStatutes(cwd: string): Record<string, unknown> {
+function readAllStatutes(cwd: string, observer?: (event: SourceReadTrace) => void): Record<string, unknown> {
   const statuteDir = govPath(cwd, "statutes");
   const statutes: Record<string, unknown> = {};
+  let entries: string[];
   try {
-    const entries = fs.readdirSync(statuteDir);
-    for (const entry of entries) {
-      if (entry.endsWith(".yaml") || entry.endsWith(".yml")) {
-        const name = path.basename(entry, path.extname(entry));
-        const obj = readYamlFile(path.join(statuteDir, entry));
-        if (obj) statutes[name] = obj;
-      }
-    }
+    entries = fs.readdirSync(statuteDir);
   } catch {
-    // no statutes dir yet
+    return statutes;
+  }
+  for (const entry of entries) {
+    if (entry.endsWith(".yaml") || entry.endsWith(".yml")) {
+      const name = path.basename(entry, path.extname(entry));
+      const obj = readGovernanceSource(cwd, `statutes/${entry}`, observer);
+      if (obj) statutes[name] = obj;
+    }
   }
   return statutes;
 }
 
-function readAllRegulations(cwd: string): Record<string, unknown> {
+function readAllRegulations(cwd: string, observer?: (event: SourceReadTrace) => void): Record<string, unknown> {
   const regDir = govPath(cwd, "regulations");
   const regs: Record<string, unknown> = {};
+  let entries: string[];
   try {
-    const entries = fs.readdirSync(regDir);
-    for (const entry of entries) {
-      if (entry.endsWith(".yaml") || entry.endsWith(".yml")) {
-        const name = path.basename(entry, path.extname(entry));
-        const obj = readYamlFile(path.join(regDir, entry));
-        if (obj) regs[name] = obj;
-      }
-    }
+    entries = fs.readdirSync(regDir);
   } catch {
-    // no regulations dir yet
+    return regs;
+  }
+  for (const entry of entries) {
+    if (entry.endsWith(".yaml") || entry.endsWith(".yml")) {
+      const name = path.basename(entry, path.extname(entry));
+      const obj = readGovernanceSource(cwd, `regulations/${entry}`, observer);
+      if (obj) regs[name] = obj;
+    }
   }
   return regs;
 }
@@ -495,44 +554,40 @@ function dedupeBy<T>(values: T[], key: (value: T) => string): T[] {
   });
 }
 
-export function loadState(cwd: string): GovernanceState {
+export function loadState(cwd: string, options: LoadStateOptions = {}): GovernanceState {
   const governanceDir = govPath(cwd);
-  const current = readYamlFile<Record<string, unknown>>(govPath(cwd, "current.json"));
+  const readSource = <T>(relativePath: string): T | null =>
+    readGovernanceSource<T>(cwd, relativePath, options.onSourceRead);
+  const current = readSource<Record<string, unknown>>("current.json");
 
-  const constitution = readYamlFile<ConstitutionConfig>(
-    govPath(cwd, "constitution.yaml")
-  ) ?? normalizeLegacyConstitution(readYamlFile<Record<string, unknown>>(govPath(cwd, "constitution.json")));
+  const constitution = readSource<ConstitutionConfig>("constitution.yaml")
+    ?? normalizeLegacyConstitution(readSource<Record<string, unknown>>("constitution.json"));
 
-  const statutes = readAllStatutes(cwd);
-  const regulations = readAllRegulations(cwd);
+  const statutes = readAllStatutes(cwd, options.onSourceRead);
+  const regulations = readAllRegulations(cwd, options.onSourceRead);
 
   const cases = dedupeBy(
-    readAllStructuredFiles<Record<string, unknown>>(govPath(cwd, "cases")).map(normalizeCase).filter(isCase),
+    readAllStructuredFiles<Record<string, unknown>>(cwd, "cases", options.onSourceRead).map(normalizeCase).filter(isCase),
     (item) => item.case_id
   );
   const tickets = dedupeBy(
-    readAllStructuredFiles<Record<string, unknown>>(govPath(cwd, "tickets")).map(normalizeTicket).filter(isTicket),
+    readAllStructuredFiles<Record<string, unknown>>(cwd, "tickets", options.onSourceRead).map(normalizeTicket).filter(isTicket),
     (item) => item.ticket_id
   );
   const decisions = dedupeBy(
-    readAllStructuredFiles<ArchitectureDecision>(govPath(cwd, "decisions")),
+    readAllStructuredFiles<ArchitectureDecision>(cwd, "decisions", options.onSourceRead),
     (item) => item.decision_id
   );
   const invariants = dedupeBy(
-    readAllStructuredFiles<ArchitectureInvariant>(govPath(cwd, "invariants")),
+    readAllStructuredFiles<ArchitectureInvariant>(cwd, "invariants", options.onSourceRead),
     (item) => item.invariant_id
   );
-  const activePrecedents = readAllStructuredFiles<Precedent>(
-    govPath(cwd, "precedents", "active")
-  );
-  const overruledPrecedents = readAllStructuredFiles<Precedent>(
-    govPath(cwd, "precedents", "overruled")
-  );
+  const activePrecedents = readAllStructuredFiles<Precedent>(cwd, "precedents/active", options.onSourceRead);
+  const overruledPrecedents = readAllStructuredFiles<Precedent>(cwd, "precedents/overruled", options.onSourceRead);
   const precedents = dedupeBy([...activePrecedents, ...overruledPrecedents], (item) => item.precedent_id);
 
-  const rawLedger = readYamlFile<{ branches: BranchEntry[] }>(
-    govPath(cwd, "branches", "branch_ledger.yaml")
-  ) ?? readYamlFile<{ branches: BranchEntry[] }>(govPath(cwd, "branches", "branch_ledger.json"));
+  const rawLedger = readSource<{ branches: BranchEntry[] }>("branches/branch_ledger.yaml")
+    ?? readSource<{ branches: BranchEntry[] }>("branches/branch_ledger.json");
   const rawBranches = Array.isArray(rawLedger?.branches) ? rawLedger.branches : [];
   const branchLedger: BranchLedger = {
     branches: rawBranches.filter(isRecord).map(normalizeBranch).filter(isBranchEntry),

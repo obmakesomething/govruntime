@@ -3,6 +3,7 @@
  */
 // State
 export { loadState, readYamlFile, readJsonlFile, readAllYamlFiles, govPath } from "./state/loader.js";
+export type { LoadStateOptions, SourceReadOutcome, SourceReadTrace } from "./state/loader.js";
 export * from "./state/types.js";
 export * from "./state/ids.js";
 export * from "./state/writer.js";

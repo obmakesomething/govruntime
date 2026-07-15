@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import childProcess from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -80,6 +81,75 @@ test("loads runtime config from a .governance fixture", () => {
   assert.equal(state.runtime_config.product_mode, "development");
   assert.equal(state.runtime_config.enforcement_mode, "advisory");
   assert.equal(state.runtime_config.path_validation.enabled, true);
+});
+
+test("traces exact structured source reads without changing loaded state", () => {
+  const constitution = "version: '0.1'\n";
+  const validCase = "case_id: CASE-TRACE\nstatus: open\n";
+  const invalidCase = "{ not valid json\n";
+  const cwd = makeSourceFixture({
+    "constitution.yaml": constitution,
+    "cases/valid.yaml": validCase,
+    "cases/invalid.json": invalidCase,
+  });
+  const fingerprint = (contents) => `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+  const trace = [];
+
+  const baseline = loadState(cwd);
+  const traced = loadState(cwd, { onSourceRead: (event) => trace.push(event) });
+
+  assert.deepEqual(traced, baseline);
+  assert.deepEqual(trace.find((event) => event.path === "current.json"), {
+    path: "current.json",
+    outcome: "missing",
+    fingerprint: null,
+  });
+  assert.deepEqual(trace.find((event) => event.path === "constitution.yaml"), {
+    path: "constitution.yaml",
+    outcome: "loaded",
+    fingerprint: fingerprint(constitution),
+  });
+  assert.deepEqual(trace.find((event) => event.path === "cases/valid.yaml"), {
+    path: "cases/valid.yaml",
+    outcome: "loaded",
+    fingerprint: fingerprint(validCase),
+  });
+  assert.deepEqual(trace.find((event) => event.path === "cases/invalid.json"), {
+    path: "cases/invalid.json",
+    outcome: "invalid",
+    fingerprint: fingerprint(invalidCase),
+  });
+});
+
+test("propagates source observer exceptions without false parse outcomes", () => {
+  const cwd = makeSourceFixture({
+    "cases/valid.yaml": "case_id: CASE-OBSERVER\nstatus: open\n",
+  });
+  const outcomes = [];
+  let thrown = null;
+
+  try {
+    loadState(cwd, {
+      onSourceRead: (event) => {
+        if (event.path !== "cases/valid.yaml") return;
+        outcomes.push(event.outcome);
+        if (event.outcome === "loaded") throw new Error("observer failed");
+      },
+    });
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.deepEqual(
+    {
+      error: thrown instanceof Error ? thrown.message : null,
+      outcomes,
+    },
+    {
+      error: "observer failed",
+      outcomes: ["loaded"],
+    }
+  );
 });
 
 test("loads pre-alpha JSON governance state", () => {

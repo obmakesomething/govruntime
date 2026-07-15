@@ -4,7 +4,9 @@
 import path from "node:path";
 import chalk from "chalk";
 import { loadState, readJsonlFile, govPath } from "@govruntime/govd";
-import { buildStateDebug } from "./diagnostics.js";
+import type { SourceReadTrace } from "@govruntime/govd";
+import type { GovernanceSourceDebug } from "./diagnostics.js";
+import { buildStateDebug, captureGovernanceInventory } from "./diagnostics.js";
 export function registerStatus(program) {
     program
         .command("status")
@@ -13,7 +15,17 @@ export function registerStatus(program) {
         .option("--debug-state", "Show loader inputs and active-state selection details")
         .action((opts) => {
         const cwd = path.resolve(opts.cwd);
-        const state = loadState(cwd);
+        let debug: GovernanceSourceDebug | null = null;
+        let state;
+        if (opts.debugState) {
+            const inventory = captureGovernanceInventory(cwd);
+            const trace: SourceReadTrace[] = [];
+            state = loadState(cwd, { onSourceRead: (event) => trace.push(event) });
+            debug = buildStateDebug(cwd, state, inventory, trace);
+        }
+        else {
+            state = loadState(cwd);
+        }
         console.log(chalk.bold.cyan("\n⚖️  Governance Status\n"));
         // Current Case
         console.log(chalk.bold("Current Case"));
@@ -97,17 +109,17 @@ export function registerStatus(program) {
         else {
             console.log(`  Initialize governance: ${chalk.cyan("govctl init")}`);
         }
-        if (opts.debugState) {
-            printDebugState(cwd, state);
+        if (debug) {
+            printDebugState(debug);
         }
         console.log("");
     });
 }
-function printDebugState(cwd, state) {
-    const debug = buildStateDebug(cwd, state);
+function printDebugState(debug) {
     console.log("");
     console.log(chalk.bold("Debug State"));
     console.log(`  Format:    ${debug.format}`);
+    console.log(`  Snapshot:  ${debug.snapshot}`);
     console.log(`  Gov dir:   ${debug.governance_dir_exists ? debug.governance_dir : `${debug.governance_dir} (missing)`}`);
     console.log(`  Active:    case=${debug.active.case_id ?? "none"} ticket=${debug.active.ticket_id ?? "none"} branch=${debug.active.branch ?? "none"}`);
     console.log(`  Counts:    cases=${debug.counts.cases} tickets=${debug.counts.tickets} branches=${debug.counts.branches}`);
