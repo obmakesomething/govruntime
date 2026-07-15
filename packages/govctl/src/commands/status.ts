@@ -4,11 +4,13 @@
 import path from "node:path";
 import chalk from "chalk";
 import { loadState, readJsonlFile, govPath } from "@govruntime/govd";
+import { buildStateDebug } from "./diagnostics.js";
 export function registerStatus(program) {
     program
         .command("status")
         .description("Show current governance posture")
         .option("--cwd <path>", "Working directory", process.cwd())
+        .option("--debug-state", "Show loader inputs and active-state selection details")
         .action((opts) => {
         const cwd = path.resolve(opts.cwd);
         const state = loadState(cwd);
@@ -95,8 +97,39 @@ export function registerStatus(program) {
         else {
             console.log(`  Initialize governance: ${chalk.cyan("govctl init")}`);
         }
+        if (opts.debugState) {
+            printDebugState(cwd, state);
+        }
         console.log("");
     });
+}
+function printDebugState(cwd, state) {
+    const debug = buildStateDebug(cwd, state);
+    console.log("");
+    console.log(chalk.bold("Debug State"));
+    console.log(`  Format:    ${debug.format}`);
+    console.log(`  Gov dir:   ${debug.governance_dir_exists ? debug.governance_dir : `${debug.governance_dir} (missing)`}`);
+    console.log(`  Active:    case=${debug.active.case_id ?? "none"} ticket=${debug.active.ticket_id ?? "none"} branch=${debug.active.branch ?? "none"}`);
+    console.log(`  Counts:    cases=${debug.counts.cases} tickets=${debug.counts.tickets} branches=${debug.counts.branches}`);
+    console.log(`  Legacy:    yaml_cases=${debug.counts.legacy_yaml_cases} json_cases=${debug.counts.legacy_json_cases} yaml_tickets=${debug.counts.legacy_yaml_tickets} json_tickets=${debug.counts.legacy_json_tickets}`);
+    if (debug.files_present.length > 0) {
+        console.log("  Files present:");
+        for (const file of debug.files_present) {
+            console.log(`    - ${file}`);
+        }
+    }
+    if (debug.files_read.length > 0) {
+        console.log("  Files read:");
+        for (const file of debug.files_read) {
+            console.log(`    - ${file}`);
+        }
+    }
+    if (debug.ignored_or_unsupported.length > 0) {
+        console.log("  Ignored / unsupported:");
+        for (const file of debug.ignored_or_unsupported) {
+            console.log(`    - ${file}`);
+        }
+    }
 }
 function computeWhy(cwd, state) {
     if (!state.active_case)
