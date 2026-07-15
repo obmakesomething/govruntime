@@ -13,6 +13,7 @@ import {
 } from "../dist/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const govd = new URL("../dist/index.js", import.meta.url).href;
 const govctl = path.resolve(__dirname, "../../govctl/dist/index.js");
 
 function runGovctl(args, cwd) {
@@ -210,6 +211,259 @@ test("falls back from invalid selectors with stable ID tie-breakers", () => {
   const state = loadState(cwd);
   assert.equal(state.active_case?.case_id, "CASE-A");
   assert.equal(state.active_ticket?.ticket_id, "T-A-R1");
+});
+
+test("normalizes legacy timestamps before selecting active state", () => {
+  const cwd = makeSourceFixture({
+    "cases/instant-newer.yaml": [
+      "case_id: CASE-INSTANT-NEWER",
+      "status: open",
+      "opened_at: 2026-07-15T23:30:00-08:00",
+      "",
+    ].join("\n"),
+    "cases/lexically-newer.yaml": [
+      "case_id: CASE-LEXICALLY-NEWER",
+      "status: open",
+      "opened_at: 2026-07-16T07:00:00Z",
+      "closed_at: 2026-07-15T10:00:00+09:00",
+      "",
+    ].join("\n"),
+    "cases/invalid.json": JSON.stringify({
+      case_id: "CASE-INVALID-TIMESTAMPS",
+      status: "closed",
+      opened_at: "not-a-timestamp",
+      closed_at: "still-not-a-timestamp",
+    }),
+    "tickets/instant-newer.json": JSON.stringify({
+      ticket_id: "T-INSTANT-NEWER-R1",
+      case_id: "CASE-INSTANT-NEWER",
+      status: "in_progress",
+      created_at: "2026-07-15T10:00:00+09:00",
+      updated_at: "2026-07-15T23:45:00-08:00",
+    }),
+    "tickets/lexically-newer.json": JSON.stringify({
+      ticket_id: "T-LEXICALLY-NEWER-R1",
+      case_id: "CASE-INSTANT-NEWER",
+      status: "in_progress",
+      created_at: "2026-07-16T06:30:00Z",
+      updated_at: "2026-07-16T07:00:00Z",
+      closed_at: "2026-07-15T11:00:00+09:00",
+    }),
+    "tickets/invalid.json": JSON.stringify({
+      ticket_id: "T-INVALID-TIMESTAMPS-R1",
+      case_id: "CASE-INSTANT-NEWER",
+      status: "done",
+      created_at: "not-a-timestamp",
+      updated_at: "still-not-a-timestamp",
+      closed_at: "invalid-too",
+    }),
+    "branches/branch_ledger.json": JSON.stringify({
+      branches: [
+        {
+          branch: "codex/fix/valid-timestamps",
+          case_id: "CASE-INSTANT-NEWER",
+          ticket_id: "T-INSTANT-NEWER-R1",
+          status: "active",
+          created_at: "2026-07-15T10:00:00+09:00",
+          merged_at: "2026-07-15T11:00:00+09:00",
+          abandoned_at: "2026-07-15T12:00:00+09:00",
+        },
+        {
+          branch: "codex/fix/invalid-timestamps",
+          case_id: "CASE-INSTANT-NEWER",
+          ticket_id: "T-INSTANT-NEWER-R1",
+          status: "paused",
+          created_at: "not-a-timestamp",
+          merged_at: "invalid-too",
+          abandoned_at: "not-a-timestamp",
+        },
+      ],
+    }),
+  });
+
+  const state = loadState(cwd);
+  const validClosedCase = state.cases.find((item) => item.case_id === "CASE-LEXICALLY-NEWER");
+  const invalidCase = state.cases.find((item) => item.case_id === "CASE-INVALID-TIMESTAMPS");
+  const validTicket = state.tickets.find((item) => item.ticket_id === "T-INSTANT-NEWER-R1");
+  const validClosedTicket = state.tickets.find((item) => item.ticket_id === "T-LEXICALLY-NEWER-R1");
+  const invalidTicket = state.tickets.find((item) => item.ticket_id === "T-INVALID-TIMESTAMPS-R1");
+  const validBranch = state.branch_ledger.branches.find((item) => item.branch === "codex/fix/valid-timestamps");
+  const invalidBranch = state.branch_ledger.branches.find((item) => item.branch === "codex/fix/invalid-timestamps");
+
+  assert.equal(state.active_case?.case_id, "CASE-INSTANT-NEWER");
+  assert.equal(state.active_case?.opened_at, "2026-07-16T07:30:00.000Z");
+  assert.equal(state.active_ticket?.ticket_id, "T-INSTANT-NEWER-R1");
+  assert.equal(validClosedCase?.closed_at, "2026-07-15T01:00:00.000Z");
+  assert.equal(validTicket?.created_at, "2026-07-15T01:00:00.000Z");
+  assert.equal(validTicket?.updated_at, "2026-07-16T07:45:00.000Z");
+  assert.equal(validClosedTicket?.closed_at, "2026-07-15T02:00:00.000Z");
+  assert.equal(invalidCase?.opened_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(Object.hasOwn(invalidCase ?? {}, "closed_at"), false);
+  assert.equal(invalidTicket?.created_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(invalidTicket?.updated_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(Object.hasOwn(invalidTicket ?? {}, "closed_at"), false);
+  assert.equal(validBranch?.created_at, "2026-07-15T01:00:00.000Z");
+  assert.equal(validBranch?.merged_at, "2026-07-15T02:00:00.000Z");
+  assert.equal(validBranch?.abandoned_at, "2026-07-15T03:00:00.000Z");
+  assert.equal(invalidBranch?.created_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(Object.hasOwn(invalidBranch ?? {}, "merged_at"), false);
+  assert.equal(Object.hasOwn(invalidBranch ?? {}, "abandoned_at"), false);
+});
+
+test("normalizes deterministic ISO timestamps independently of process timezone", () => {
+  const cwd = makeSourceFixture({
+    "cases/timezone-less.json": JSON.stringify({
+      case_id: "CASE-TIMEZONE-LESS",
+      status: "open",
+      opened_at: "2026-07-15T10:00:00",
+    }),
+    "cases/zoned-newer.json": JSON.stringify({
+      case_id: "CASE-ZONED-NEWER",
+      status: "open",
+      opened_at: "2026-07-15T13:00:00Z",
+    }),
+    "cases/date-only.json": JSON.stringify({
+      case_id: "CASE-DATE-ONLY",
+      status: "closed",
+      opened_at: "2026-07-15",
+    }),
+    "cases/non-iso.json": JSON.stringify({
+      case_id: "CASE-NON-ISO",
+      status: "closed",
+      opened_at: "07/15/2026 10:00:00",
+      closed_at: "07/15/2026 11:00:00",
+    }),
+    "tickets/timezone-less.json": JSON.stringify({
+      ticket_id: "T-TIMEZONE-LESS-R1",
+      case_id: "CASE-ZONED-NEWER",
+      status: "in_progress",
+      created_at: "2026-07-15",
+      updated_at: "2026-07-15T10:00:00",
+    }),
+    "tickets/zoned-newer.json": JSON.stringify({
+      ticket_id: "T-ZONED-NEWER-R1",
+      case_id: "CASE-ZONED-NEWER",
+      status: "in_progress",
+      created_at: "2026-07-15T12:00:00Z",
+      updated_at: "2026-07-15T13:00:00Z",
+    }),
+    "tickets/non-iso.json": JSON.stringify({
+      ticket_id: "T-NON-ISO-R1",
+      case_id: "CASE-ZONED-NEWER",
+      status: "done",
+      created_at: "07/15/2026 10:00:00",
+      updated_at: "07/15/2026 11:00:00",
+      closed_at: "07/15/2026 12:00:00",
+    }),
+  });
+
+  const loadInTimezone = (timezone) => {
+    const script = `
+      const { loadState } = await import(${JSON.stringify(govd)});
+      const state = loadState(${JSON.stringify(cwd)});
+      const timezoneLessCase = state.cases.find((item) => item.case_id === "CASE-TIMEZONE-LESS");
+      const dateOnlyCase = state.cases.find((item) => item.case_id === "CASE-DATE-ONLY");
+      const nonIsoCase = state.cases.find((item) => item.case_id === "CASE-NON-ISO");
+      const timezoneLessTicket = state.tickets.find((item) => item.ticket_id === "T-TIMEZONE-LESS-R1");
+      const nonIsoTicket = state.tickets.find((item) => item.ticket_id === "T-NON-ISO-R1");
+      process.stdout.write(JSON.stringify({
+        activeCase: state.active_case?.case_id ?? null,
+        activeTicket: state.active_ticket?.ticket_id ?? null,
+        timezoneLessCase: timezoneLessCase?.opened_at,
+        dateOnlyCase: dateOnlyCase?.opened_at,
+        nonIsoCase: nonIsoCase?.opened_at,
+        nonIsoCaseClosedAtPresent: Object.hasOwn(nonIsoCase ?? {}, "closed_at"),
+        timezoneLessTicketCreatedAt: timezoneLessTicket?.created_at,
+        timezoneLessTicketUpdatedAt: timezoneLessTicket?.updated_at,
+        nonIsoTicketCreatedAt: nonIsoTicket?.created_at,
+        nonIsoTicketUpdatedAt: nonIsoTicket?.updated_at,
+        nonIsoTicketClosedAtPresent: Object.hasOwn(nonIsoTicket ?? {}, "closed_at"),
+      }));
+    `;
+    const result = childProcess.spawnSync(process.execPath, ["--input-type=module", "--eval", script], {
+      encoding: "utf8",
+      env: { ...process.env, TZ: timezone },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+
+  const utc = loadInTimezone("UTC");
+  const losAngeles = loadInTimezone("America/Los_Angeles");
+  assert.deepEqual(losAngeles, utc);
+  assert.deepEqual(utc, {
+    activeCase: "CASE-ZONED-NEWER",
+    activeTicket: "T-ZONED-NEWER-R1",
+    timezoneLessCase: "2026-07-15T10:00:00.000Z",
+    dateOnlyCase: "2026-07-15T00:00:00.000Z",
+    nonIsoCase: "1970-01-01T00:00:00.000Z",
+    nonIsoCaseClosedAtPresent: false,
+    timezoneLessTicketCreatedAt: "2026-07-15T00:00:00.000Z",
+    timezoneLessTicketUpdatedAt: "2026-07-15T10:00:00.000Z",
+    nonIsoTicketCreatedAt: "1970-01-01T00:00:00.000Z",
+    nonIsoTicketUpdatedAt: "1970-01-01T00:00:00.000Z",
+    nonIsoTicketClosedAtPresent: false,
+  });
+});
+
+test("preserves legacy required timestamp alias fallbacks", () => {
+  const cwd = makeSourceFixture({
+    "cases/created-alias.yaml": [
+      "case_id: CASE-CREATED-ALIAS",
+      "status: closed",
+      "created_at: 2026-07-15T10:00:00+09:00",
+      "",
+    ].join("\n"),
+    "cases/updated-alias.yaml": [
+      "case_id: CASE-UPDATED-ALIAS",
+      "status: closed",
+      "updated_at: 2026-07-15T10:30:00+09:00",
+      "",
+    ].join("\n"),
+    "cases/absent-aliases.yaml": [
+      "case_id: CASE-ABSENT-ALIASES",
+      "status: closed",
+      "",
+    ].join("\n"),
+    "tickets/updated-alias.yaml": [
+      "ticket_id: T-UPDATED-ALIAS-R1",
+      "case_id: CASE-CREATED-ALIAS",
+      "status: done",
+      "updated_at: 2026-07-15T11:00:00+09:00",
+      "",
+    ].join("\n"),
+    "tickets/created-alias.yaml": [
+      "ticket_id: T-CREATED-ALIAS-R1",
+      "case_id: CASE-CREATED-ALIAS",
+      "status: done",
+      "created_at: 2026-07-15T12:00:00+09:00",
+      "",
+    ].join("\n"),
+    "tickets/absent-aliases.yaml": [
+      "ticket_id: T-ABSENT-ALIASES-R1",
+      "case_id: CASE-CREATED-ALIAS",
+      "status: done",
+      "",
+    ].join("\n"),
+  });
+
+  const state = loadState(cwd);
+  const createdAliasCase = state.cases.find((item) => item.case_id === "CASE-CREATED-ALIAS");
+  const updatedAliasCase = state.cases.find((item) => item.case_id === "CASE-UPDATED-ALIAS");
+  const absentAliasCase = state.cases.find((item) => item.case_id === "CASE-ABSENT-ALIASES");
+  const updatedAliasTicket = state.tickets.find((item) => item.ticket_id === "T-UPDATED-ALIAS-R1");
+  const createdAliasTicket = state.tickets.find((item) => item.ticket_id === "T-CREATED-ALIAS-R1");
+  const absentAliasTicket = state.tickets.find((item) => item.ticket_id === "T-ABSENT-ALIASES-R1");
+
+  assert.equal(createdAliasCase?.opened_at, "2026-07-15T01:00:00.000Z");
+  assert.equal(updatedAliasCase?.opened_at, "2026-07-15T01:30:00.000Z");
+  assert.equal(absentAliasCase?.opened_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(updatedAliasTicket?.created_at, "2026-07-15T02:00:00.000Z");
+  assert.equal(updatedAliasTicket?.updated_at, "2026-07-15T02:00:00.000Z");
+  assert.equal(createdAliasTicket?.created_at, "2026-07-15T03:00:00.000Z");
+  assert.equal(createdAliasTicket?.updated_at, "2026-07-15T03:00:00.000Z");
+  assert.equal(absentAliasTicket?.created_at, "1970-01-01T00:00:00.000Z");
+  assert.equal(absentAliasTicket?.updated_at, "1970-01-01T00:00:00.000Z");
 });
 
 test("rejects terminal current selectors and preserves active relationships", () => {
