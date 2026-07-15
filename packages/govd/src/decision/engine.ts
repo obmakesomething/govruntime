@@ -52,7 +52,7 @@ export interface InvariantFinding {
 export function recordDecision(cwd: string, input: RecordDecisionInput): ArchitectureDecision {
   const now = nowISO();
   const decision: ArchitectureDecision = {
-    decision_id: newDecisionId(),
+    decision_id: newDecisionId(cwd),
     status: "active",
     title: input.title,
     statement: input.statement ?? input.title,
@@ -69,7 +69,7 @@ export function recordDecision(cwd: string, input: RecordDecisionInput): Archite
 
 export function createInvariant(cwd: string, input: CreateInvariantInput): ArchitectureInvariant {
   const invariant: ArchitectureInvariant = {
-    invariant_id: newInvariantId(),
+    invariant_id: newInvariantId(cwd),
     status: "active",
     name: input.name,
     title: input.title ?? input.name.replace(/[-_]+/g, " "),

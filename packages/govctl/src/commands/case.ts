@@ -79,7 +79,7 @@ export function registerCase(program) {
         .option("--claims <claims...>", "User claims (can repeat)")
         .action((opts) => {
         const cwd = path.resolve(opts.cwd);
-        const caseId = newCaseId(opts.label ?? opts.title.slice(0, 20));
+        const caseId = newCaseId(cwd, opts.label ?? opts.title.slice(0, 20));
         const now = nowISO();
         const c = {
             case_id: caseId,
