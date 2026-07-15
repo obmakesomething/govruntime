@@ -26,6 +26,8 @@ import type {
 } from "./types.js";
 
 const GOVERNANCE_DIR = ".governance";
+const EPOCH_TIMESTAMP = new Date(0).toISOString();
+const ISO_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))?)?$/;
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   namespace: "@govruntime",
@@ -269,6 +271,7 @@ function normalizeLegacyConstitution(raw: Record<string, unknown> | null): Const
 
 function normalizeCase(raw: Record<string, unknown>): Case {
   const applicableLaw = raw["applicable_law"];
+  const closedAt = normalizeTimestamp(raw["closed_at"]);
   return {
     case_id: String(raw["case_id"] ?? raw["id"] ?? ""),
     status: normalizeAllowedEnum(
@@ -277,8 +280,8 @@ function normalizeCase(raw: Record<string, unknown>): Case {
       "DRAFT"
     ) as Case["status"],
     title: String(raw["title"] ?? raw["issue"] ?? "Untitled governance case"),
-    opened_at: String(raw["opened_at"] ?? raw["created_at"] ?? raw["updated_at"] ?? new Date(0).toISOString()),
-    closed_at: typeof raw["closed_at"] === "string" ? raw["closed_at"] : undefined,
+    opened_at: normalizeRequiredTimestamp(raw["opened_at"] ?? raw["created_at"] ?? raw["updated_at"]),
+    ...(closedAt ? { closed_at: closedAt } : {}),
     issue: stringArray(raw["issue"]),
     claims: isRecord(raw["claims"])
       ? raw["claims"] as Case["claims"]
@@ -305,6 +308,7 @@ function normalizeCase(raw: Record<string, unknown>): Case {
 
 function normalizeTicket(raw: Record<string, unknown>): Ticket {
   const ticketId = String(raw["ticket_id"] ?? raw["id"] ?? "");
+  const closedAt = normalizeTimestamp(raw["closed_at"]);
   return {
     ticket_id: ticketId,
     revision: positiveInteger(raw["revision"], revisionFromId(ticketId) ?? 1),
@@ -329,16 +333,19 @@ function normalizeTicket(raw: Record<string, unknown>): Ticket {
     assigned_agent: normalizeAssignedAgent(raw["assigned_agent"]),
     risk_profile: normalizeRiskProfile(raw["risk_profile"]),
     verification_plan: normalizeVerificationPlan(raw["verification_plan"], raw["validation_plan"]),
-    created_at: String(raw["created_at"] ?? raw["updated_at"] ?? new Date(0).toISOString()),
-    updated_at: String(raw["updated_at"] ?? raw["created_at"] ?? new Date(0).toISOString()),
-    closed_at: typeof raw["closed_at"] === "string" ? raw["closed_at"] : undefined,
+    created_at: normalizeRequiredTimestamp(raw["created_at"] ?? raw["updated_at"]),
+    updated_at: normalizeRequiredTimestamp(raw["updated_at"] ?? raw["created_at"]),
+    ...(closedAt ? { closed_at: closedAt } : {}),
   };
 }
 
 function normalizeBranch(raw: BranchEntry): BranchEntry {
   const exitConditions = raw.exit_conditions;
+  const { merged_at: _mergedAt, abandoned_at: _abandonedAt, ...rawWithoutOptionalTimestamps } = raw;
+  const mergedAt = normalizeTimestamp(raw.merged_at);
+  const abandonedAt = normalizeTimestamp(raw.abandoned_at);
   return {
-    ...raw,
+    ...rawWithoutOptionalTimestamps,
     branch: String(raw.branch ?? ""),
     case_id: String(raw.case_id ?? ""),
     ticket_id: String(raw.ticket_id ?? ""),
@@ -356,8 +363,56 @@ function normalizeBranch(raw: BranchEntry): BranchEntry {
     exit_conditions: isRecord(exitConditions) && Array.isArray(exitConditions["merge_when"])
       ? exitConditions as BranchEntry["exit_conditions"]
       : { merge_when: stringArray(exitConditions), abandon_when: [] },
-    created_at: String(raw.created_at ?? new Date(0).toISOString()),
+    created_at: normalizeRequiredTimestamp(raw.created_at),
+    ...(mergedAt ? { merged_at: mergedAt } : {}),
+    ...(abandonedAt ? { abandoned_at: abandonedAt } : {}),
   };
+}
+
+function normalizeRequiredTimestamp(value: unknown): string {
+  return normalizeTimestamp(value) ?? EPOCH_TIMESTAMP;
+}
+
+function normalizeTimestamp(value: unknown): string | undefined {
+  const timestamp = value instanceof Date
+    ? value.getTime()
+    : typeof value === "string"
+      ? parseIsoTimestamp(value)
+      : Number.NaN;
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
+
+function parseIsoTimestamp(value: string): number {
+  const match = ISO_TIMESTAMP_PATTERN.exec(value);
+  if (!match) return Number.NaN;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , zone, , offsetHourText, offsetMinuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const calendarDate = new Date(0);
+  calendarDate.setUTCFullYear(year, month - 1, day);
+  calendarDate.setUTCHours(0, 0, 0, 0);
+  if (
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) {
+    return Number.NaN;
+  }
+
+  if (hourText == null) return calendarDate.getTime();
+  if (
+    Number(hourText) > 23 ||
+    Number(minuteText) > 59 ||
+    Number(secondText) > 59 ||
+    (offsetHourText != null && Number(offsetHourText) > 23) ||
+    (offsetMinuteText != null && Number(offsetMinuteText) > 59)
+  ) {
+    return Number.NaN;
+  }
+
+  return Date.parse(zone ? value : `${value}Z`);
 }
 
 function normalizeAssignedAgent(value: unknown): Ticket["assigned_agent"] {
