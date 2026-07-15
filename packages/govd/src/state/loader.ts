@@ -78,15 +78,26 @@ function readStructuredFile<T = any>(
   filePath: string,
   trace?: { path: string; observer: (event: SourceReadTrace) => void }
 ): T | null {
+  if (!trace) {
+    try {
+      const raw = fs.readFileSync(filePath, "utf8");
+      return path.extname(filePath).toLowerCase() === ".json"
+        ? JSON.parse(raw) as T
+        : yaml.load(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+
   let bytes: Buffer;
   try {
     bytes = fs.readFileSync(filePath);
   } catch {
-    trace?.observer({ path: trace.path, outcome: "missing", fingerprint: null });
+    trace.observer({ path: trace.path, outcome: "missing", fingerprint: null });
     return null;
   }
 
-  const fingerprint = trace ? fingerprintBytes(bytes) : null;
+  const fingerprint = fingerprintBytes(bytes);
   let value: T | null;
   let outcome: SourceReadOutcome;
   try {
@@ -99,7 +110,7 @@ function readStructuredFile<T = any>(
     value = null;
     outcome = "invalid";
   }
-  trace?.observer({ path: trace.path, outcome, fingerprint });
+  trace.observer({ path: trace.path, outcome, fingerprint });
   return value;
 }
 

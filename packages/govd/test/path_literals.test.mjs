@@ -121,6 +121,43 @@ test("traces exact structured source reads without changing loaded state", () =>
   });
 });
 
+test("uses direct UTF-8 reads unless source tracing needs exact bytes", () => {
+  const contents = Buffer.from("version: '0.1'\nlabel: café\r\n", "utf8");
+  const cwd = makeSourceFixture({ "constitution.yaml": contents });
+  const constitutionPath = path.join(cwd, ".governance", "constitution.yaml");
+  const originalReadFileSync = fs.readFileSync;
+  const calls = [];
+  const trace = [];
+  let baseline;
+  let traced;
+
+  fs.readFileSync = function instrumentedReadFileSync(...args) {
+    const result = Reflect.apply(originalReadFileSync, this, args);
+    if (path.resolve(String(args[0])) === constitutionPath) {
+      calls.push({ options: args[1], returnedBuffer: Buffer.isBuffer(result) });
+    }
+    return result;
+  };
+
+  try {
+    baseline = loadState(cwd);
+    traced = loadState(cwd, { onSourceRead: (event) => trace.push(event) });
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
+
+  assert.deepEqual(traced, baseline);
+  assert.deepEqual(calls, [
+    { options: "utf8", returnedBuffer: false },
+    { options: undefined, returnedBuffer: true },
+  ]);
+  assert.deepEqual(trace.find((event) => event.path === "constitution.yaml"), {
+    path: "constitution.yaml",
+    outcome: "loaded",
+    fingerprint: `sha256:${createHash("sha256").update(contents).digest("hex")}`,
+  });
+});
+
 test("propagates source observer exceptions without false parse outcomes", () => {
   const cwd = makeSourceFixture({
     "cases/valid.yaml": "case_id: CASE-OBSERVER\nstatus: open\n",
