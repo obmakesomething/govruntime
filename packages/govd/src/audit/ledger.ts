@@ -162,6 +162,21 @@ export function verifyAuditLedger(cwd: string): AuditVerificationResult {
   return { ok: true, checked, head };
 }
 
+export function isAuditHeadExactlyOneEntryBehind(cwd: string): boolean {
+  const lockPath = path.join(auditDir(cwd), ".locks", "ledger.lock");
+  return withFileLock(lockPath, () => recoverableAuditHead(cwd) !== null);
+}
+
+export function repairAuditHeadIfExactlyOneEntryBehind(cwd: string): boolean {
+  const lockPath = path.join(auditDir(cwd), ".locks", "ledger.lock");
+  return withFileLock(lockPath, () => {
+    const repairedHead = recoverableAuditHead(cwd);
+    if (!repairedHead) return false;
+    writeAuditHead(cwd, repairedHead);
+    return true;
+  });
+}
+
 export function inspectLedgerRecord(cwd: string, seq: number): AuditEnvelope | null {
   return readLedger(cwd).find((entry) => entry.seq === seq) ?? null;
 }
@@ -207,6 +222,60 @@ function readLedgerLines(cwd: string): string[] {
   } catch {
     return [];
   }
+}
+
+function readAuditHeadStrict(cwd: string): AuditHead | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(headPath(cwd), "utf8")) as Partial<AuditHead>;
+    if (
+      parsed.version !== "gr.audit.head.v1"
+      || !Number.isInteger(parsed.last_seq)
+      || typeof parsed.last_hash !== "string"
+      || typeof parsed.updated_at !== "string"
+    ) {
+      return null;
+    }
+    return parsed as AuditHead;
+  } catch {
+    return null;
+  }
+}
+
+function recoverableAuditHead(cwd: string): AuditHead | null {
+  const verification = verifyAuditLedger(cwd);
+  if (verification.ok) return null;
+  if (
+    verification.failure?.reason !== "Audit head sequence mismatch."
+    && verification.failure?.reason !== "Audit head hash mismatch."
+  ) {
+    return null;
+  }
+
+  const lines = readLedgerLines(cwd);
+  if (lines.length === 0 || verification.checked !== lines.length) return null;
+  const entries = lines.map((line) => JSON.parse(line) as AuditEnvelope);
+  const finalEntry = entries.at(-1);
+  if (!finalEntry || typeof finalEntry.created_at !== "string") return null;
+
+  const prefixEntry = entries.at(-2);
+  if (prefixEntry && typeof prefixEntry.created_at !== "string") return null;
+  const expectedPrefixHead: AuditHead = prefixEntry
+    ? {
+        version: "gr.audit.head.v1",
+        last_seq: prefixEntry.seq,
+        last_hash: prefixEntry.entry_hash,
+        updated_at: prefixEntry.created_at,
+      }
+    : initialAuditHead();
+  const persistedHead = readAuditHeadStrict(cwd);
+  if (!persistedHead || canonicalJson(persistedHead) !== canonicalJson(expectedPrefixHead)) return null;
+
+  return {
+    version: "gr.audit.head.v1",
+    last_seq: finalEntry.seq,
+    last_hash: finalEntry.entry_hash,
+    updated_at: finalEntry.created_at,
+  };
 }
 
 function writeAuditHead(cwd: string, head: AuditHead): void {

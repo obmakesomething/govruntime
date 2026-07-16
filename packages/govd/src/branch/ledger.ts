@@ -15,7 +15,8 @@ import type {
 } from "../state/types.js";
 import { nowISO } from "../state/ids.js";
 import { writeBranchLedger } from "../state/writer.js";
-import { loadState } from "../state/loader.js";
+import { govPath, loadState } from "../state/loader.js";
+import { withFileLock } from "../state/file_lock.js";
 
 // ---------------------------------------------------------------------------
 // Branch naming
@@ -45,6 +46,13 @@ export function buildWorktreePath(
 // Ledger operations
 // ---------------------------------------------------------------------------
 
+export function withBranchLedgerLock<T>(cwd: string, action: () => T): T {
+  return withFileLock(
+    govPath(cwd, "branches", ".locks", "branch-ledger.lock"),
+    action,
+  );
+}
+
 export function createBranchEntry(
   cwd: string,
   opts: {
@@ -61,39 +69,41 @@ export function createBranchEntry(
     with_worktree?: boolean;
   }
 ): BranchEntry {
-  const state = loadState(cwd);
-  const ledger = state.branch_ledger;
+  return withBranchLedgerLock(cwd, () => {
+    const state = loadState(cwd);
+    const ledger = state.branch_ledger;
 
-  const branch = buildBranchName(opts.case_id, opts.ticket_id, opts.purpose);
-  const worktree = opts.with_worktree
-    ? buildWorktreePath(opts.case_id, opts.ticket_id)
-    : undefined;
+    const branch = buildBranchName(opts.case_id, opts.ticket_id, opts.purpose);
+    const worktree = opts.with_worktree
+      ? buildWorktreePath(opts.case_id, opts.ticket_id)
+      : undefined;
 
-  const entry: BranchEntry = {
-    branch,
-    worktree,
-    case_id: opts.case_id,
-    ticket_id: opts.ticket_id,
-    branch_type: opts.branch_type,
-    status: "active",
-    reason_created: opts.reason_created,
-    intended_scope: opts.intended_scope,
-    forbidden_scope: opts.forbidden_scope ?? [],
-    parent_branch: opts.parent_branch ?? "main",
-    success_criteria: opts.success_criteria ?? [],
-    exit_conditions: opts.exit_conditions ?? {
-      merge_when: ["acceptance criteria satisfied", "no unresolved conflicts"],
-      abandon_when: ["ticket superseded", "case closed without merge"],
-    },
-    created_at: nowISO(),
-  };
+    const entry: BranchEntry = {
+      branch,
+      worktree,
+      case_id: opts.case_id,
+      ticket_id: opts.ticket_id,
+      branch_type: opts.branch_type,
+      status: "active",
+      reason_created: opts.reason_created,
+      intended_scope: opts.intended_scope,
+      forbidden_scope: opts.forbidden_scope ?? [],
+      parent_branch: opts.parent_branch ?? "main",
+      success_criteria: opts.success_criteria ?? [],
+      exit_conditions: opts.exit_conditions ?? {
+        merge_when: ["acceptance criteria satisfied", "no unresolved conflicts"],
+        abandon_when: ["ticket superseded", "case closed without merge"],
+      },
+      created_at: nowISO(),
+    };
 
-  const updated: BranchLedger = {
-    branches: [...ledger.branches, entry],
-  };
+    const updated: BranchLedger = {
+      branches: [...ledger.branches, entry],
+    };
 
-  writeBranchLedger(cwd, updated);
-  return entry;
+    writeBranchLedger(cwd, updated);
+    return entry;
+  });
 }
 
 export function updateBranchStatus(
@@ -102,27 +112,29 @@ export function updateBranchStatus(
   status: BranchStatus,
   opts?: { merged_at?: string; abandoned_at?: string }
 ): BranchEntry | null {
-  const state = loadState(cwd);
-  const ledger = state.branch_ledger;
+  return withBranchLedgerLock(cwd, () => {
+    const state = loadState(cwd);
+    const ledger = state.branch_ledger;
 
-  const index = ledger.branches.findIndex((b) => b.branch === branchName);
-  if (index === -1) return null;
+    const index = ledger.branches.findIndex((b) => b.branch === branchName);
+    if (index === -1) return null;
 
-  const existing = ledger.branches[index];
-  if (!existing) return null;
+    const existing = ledger.branches[index];
+    if (!existing) return null;
 
-  const updated: BranchEntry = {
-    ...existing,
-    status,
-    merged_at: opts?.merged_at ?? existing.merged_at,
-    abandoned_at: opts?.abandoned_at ?? existing.abandoned_at,
-  };
+    const updated: BranchEntry = {
+      ...existing,
+      status,
+      merged_at: opts?.merged_at ?? existing.merged_at,
+      abandoned_at: opts?.abandoned_at ?? existing.abandoned_at,
+    };
 
-  const newBranches = [...ledger.branches];
-  newBranches[index] = updated;
+    const newBranches = [...ledger.branches];
+    newBranches[index] = updated;
 
-  writeBranchLedger(cwd, { branches: newBranches });
-  return updated;
+    writeBranchLedger(cwd, { branches: newBranches });
+    return updated;
+  });
 }
 
 export function findActiveBranchForTicket(
