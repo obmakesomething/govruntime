@@ -6,11 +6,24 @@ Give Codex, Claude Code, Cursor, and future coding agents a shared runtime for s
 
 > Git tracks the diff. GovRuntime tracks the mandate.
 
-Status: `0.1.2-alpha`
+Status: `0.1.3-alpha`
 
-Release channel: `alpha-0.1.2`
+Release channel: `alpha-0.1.3`
 
 License: Apache-2.0
+
+---
+
+## What's New in `v0.1.3-alpha`
+
+The `0.1.3-alpha` release introduces production-grade ID persistence, workflow recovery, and enhanced diagnostics for multi-process agent environments:
+
+- **Persistent Collision-Safe Entity Allocation** (`PR #1`, `PR #2`): Disk-backed sequence reservation (`.governance/state/id_store`) guarantees unique, deterministic, and sortable entity IDs (`EV-*`, `CASE-*`, `DCK-*`, `JDG-*`, `DEC-*`, `INV-*`) even across parallel CLI invocations and concurrent agent sub-processes.
+- **Recoverable Branch Abandonment** (`PR #7`): Clean recovery and state cleanup in `govctl` when git branches or agent tasks are abandoned.
+- **Opt-In Source Tracing Overhead** (`PR #6`): Tracing overhead is now opt-in, protecting performance during intensive agent execution passes while retaining diagnostic capabilities when needed.
+- **Loader-Pass Source Diagnostics & Legacy Recovery** (`PR #3`, `PR #4`, `PR #5`): Diagnoses malformed historical records during loader passes, recovers legacy state diagnostics, and normalizes timestamp selection deterministically.
+
+---
 
 ## Why this exists
 
@@ -26,6 +39,8 @@ GovRuntime answers the procedural questions that appear when agents start changi
 
 GovRuntime treats coding-agent execution as a lightweight governance system. It records scope, evidence, policy decisions, lifecycle posture, and exit checks in a local `.governance/` state directory.
 
+---
+
 ## Not an agent framework
 
 GovRuntime does not replace Codex, Claude Code, Cursor, OpenHands, LangChain, CrewAI, Mastra, or your own agent stack.
@@ -39,30 +54,48 @@ GovRuntime: governs how the work is authorized, scoped, checked, and recorded.
 
 CI checks what changed. GovRuntime governs how the change happened.
 
+---
+
 ## Packages
 
-- `@govruntime/govd`: core governance engine. Loads `.governance/*`, judges tool use, records docket/audit events, validates path literals, manages persistent collision-safe entity ID sequences, and renders context packs.
-- `@govruntime/govctl`: CLI and platform adapter layer. Provides `govctl` commands for repo posture, branch abandon recovery, and hook routing, plus the `gov` case runtime for long-running work governance.
-- `@govruntime/mcp-server`: read-only MCP server for current posture, active ticket, and docket-derived why.
+- **`@govruntime/govd`**: Core governance engine. Loads `.governance/*`, judges tool use, manages persistent collision-safe entity sequences, records docket/audit events, validates path literals, and renders context packs.
+- **`@govruntime/govctl`**: CLI and platform adapter layer. Provides `govctl` commands for repo posture, branch abandon recovery, and hook routing, plus the `gov` case runtime for long-running work governance.
+- **`@govruntime/mcp-server`**: Read-only Model Context Protocol (MCP) server exposing current posture, active tickets, and docket-derived reasoning to AI models.
 
-## Product Shape
+---
 
-Recommended integration is a three-layer shape:
+## Product Architecture
 
-1. Core control engine: `govd`
-2. Platform adapters: `govctl hook auto`
-3. Product surfaces: CLI, MCP, dashboards, CI hooks, and future SDKs
+Integration uses a decoupled three-layer architecture:
 
-Claude, Codex, Cursor, and future clients should all route lifecycle events into the same normalized hook event schema. Platform-specific behavior stays in adapters; policy judgment stays in `govd`.
+```text
++-------------------------------------------------------------+
+|   Product Surfaces (CLI, MCP, Dashboards, CI Hooks, SDKs)   |
++-------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|    Platform Adapters (`govctl hook auto claude | codex`)     |
++-------------------------------------------------------------+
+                              |
+                              v
++-------------------------------------------------------------+
+|       Core Control Engine (`@govruntime/govd` + OPA)        |
++-------------------------------------------------------------+
+```
 
-## Runtime Modes
+Claude Code, Codex, Cursor, and future clients all route lifecycle events into the same normalized hook event schema. Platform-specific behavior stays in adapters; policy judgment stays in `govd`.
 
-GovRuntime supports two enforcement modes through `.governance/constitution.yaml`:
+---
 
-- `advisory`: warn and record evidence, but allow the host agent to continue.
-- `hard-block`: promote risky warnings and stop-check failures into blocking hook responses.
+## Enforcement Modes
 
-Use:
+GovRuntime supports two enforcement modes configured in `.governance/constitution.yaml`:
+
+- **`advisory`**: Warns and records evidence, but allows the host agent to continue.
+- **`hard-block`**: Promotes risky warnings and stop-check failures into blocking hook responses.
+
+CLI commands:
 
 ```bash
 govctl mode show
@@ -70,116 +103,119 @@ govctl mode set advisory
 govctl mode set hard-block
 ```
 
-`GOVRUNTIME_ENFORCEMENT_MODE=hard-block` can override local config for CI or production runs.
+Environment override for CI or automated pipelines:
 
-## Lifecycle Logs
-
-Clean-state lifecycle events are recorded at:
-
-```text
-.governance/audit/clean_state.jsonl
+```bash
+export GOVRUNTIME_ENFORCEMENT_MODE=hard-block
 ```
 
-The intended product lifecycle is:
-
-```text
-init -> run-task -> exit-check
-```
-
-Each event includes mode, product mode, active case/ticket identifiers when available, and whether the posture is clean.
-
-## Path Literal Validation
-
-GovRuntime validates path-like tool inputs and governance-document literals before treating them as reliable execution or evidence references.
-
-Examples of checked keys include `file`, `file_path`, `filepath`, `filename`, `path`, `paths`, `target_file`, and `target_path`.
-
-In advisory mode, unresolved read paths become warnings. In hard-block mode, warnings can become blocking decisions.
+---
 
 ## Quick Start
 
 ```bash
+# Install & build
 pnpm install
 pnpm build
+
+# Initialize governance repository
 pnpm govctl init
+
+# Check & set enforcement posture
 govctl mode show
 govctl audit head
 govctl audit verify
 govctl audit checkpoint
+
+# Wire hooks for Claude Code and Codex
 govctl hook auto codex
 govctl hook auto claude
 ```
 
-`govctl init` wires Claude and Codex hooks to `govctl hook auto`, so products can switch adapters without changing the core governance engine.
+---
 
-## Long-Running Work Governance
+## Long-Running Work Governance (`gov` CLI)
 
-`gov` is the minimal case-scoped control-plane CLI for long-running agent work. It is designed for cases where state can diverge across chat, repo, artifacts, Linear, browser/account context, provider calls, governance files, and latest user intent.
+`gov` is the case-scoped control-plane CLI for long-running agent work. It ensures state integrity when work spans chat memory, code diffs, review artifacts, Linear tickets, external APIs, and governance files.
 
-The source of truth is a case folder under:
+The source of truth is a case directory:
 
 ```text
 .governance/cases/<case_id>/
 ```
 
-The flow is:
+### Complete `gov` Lifecycle Flow
 
 ```text
 append-only events
-  -> generated governance state
-  -> generated context pack
-  -> pre-tool checks / validators / Linear packet
+  -> generated governance state (`state.generated.json`)
+  -> generated context pack (`context_pack.generated.md`)
+  -> pre-tool checks / validators / Linear packets
 ```
 
-Useful commands:
+### Command Reference
 
 ```bash
+# Case initialization
 pnpm gov -- init --case pipeline3
+
+# Evidence & run tracking
 pnpm gov -- record-event --case pipeline3 --type validator_result --message "validator passed" --evidence validator#sha256:...
 pnpm gov -- record-run --case pipeline3 --run run-001 --manifest run-manifest.json
 pnpm gov -- record-stage --case pipeline3 --run run-001 --section intro --stage provider_raw_output --input prompt.md --output raw.md
 pnpm gov -- finalize-run --case pipeline3 --run run-001 --artifact-hash <sha256>
+
+# Policy enforcement & gate closure
 pnpm gov -- check --case pipeline3 --before-tool review-submit --payload payload.json
 pnpm gov -- close-gate --case pipeline3 --gate release_approval --approval approval.json
+
+# Context & integration output
 pnpm gov -- context-pack --case pipeline3
 pnpm gov -- sync-linear --case pipeline3
 ```
 
-`gov` creates generated files that should not be edited manually:
+### Generated Files & Audit Streams
 
+Do **not** edit generated artifacts directly:
 - `state.generated.json`
 - `context_pack.generated.md`
 - `linear_packet.generated.md`
 
-It also keeps append-only evidence streams:
+Append-only audit streams:
+- `.governance/cases/<case_id>/events.jsonl`
+- `.governance/cases/<case_id>/runs/<run_id>/stage_ledger.jsonl`
 
-- `events.jsonl`
-- `runs/<run_id>/stage_ledger.jsonl`
-
-Current hard blocks include full-report repair, GPT Pro review without fresh profile evidence, human-gated release/deploy/payment/credential actions, stale artifact review packets, deterministic Korean prose replacement, and unsupported release-ready or acceptance claims.
-
-Machine gates and required stage coverage are configurable in `gates.yaml`. Human gates require signed `L5` approval artifacts.
+---
 
 ## Executable Architecture Decisions
 
-GovRuntime can promote important user decisions from chat memory into executable repo-local governance state:
+GovRuntime promotes user decisions from conversation memory into executable repository-local governance state:
 
 ```text
-user statement -> evidence -> decision -> invariant or precedent -> ticket acceptance criteria -> Linear packet -> context pack / hook check
+User statement 
+  -> Evidence (`EV-*`) 
+  -> Decision (`DEC-*`) 
+  -> Invariant (`INV-*`) or Precedent (`P-*`) 
+  -> Ticket acceptance criteria 
+  -> Linear packet 
+  -> Context pack / Hook check
 ```
 
-Useful commands:
+### Command Reference
 
 ```bash
+# Record evidence and architectural decisions
 govctl evidence admit --quote "Reports must be generated section-by-section and assembled deterministically."
 govctl decision record --title "Sectioned report generation boundary" --scope "src/lib/reporting/**"
-govctl invariant create --name no-full-report-repair-in-sectioned-flow --decision DEC-...
+govctl invariant create --name no-full-report-repair-in-sectioned-flow --decision DEC-2026-07-22-001
+
+# Preset packs & invariant checks
 govctl pack install sectioned-generation
 govctl invariant check
 govctl linear packet --issue OB-1833
 ```
 
-Built-in packs include:
+### Built-in Rule Packs
 
 - `long-term-architecture-correctness`
 - `sectioned-generation`
@@ -187,18 +223,18 @@ Built-in packs include:
 - `linear-ops-standing-authorization`
 - `chrome-profile-routing`
 
-These packs are intentionally repo-local. The source of truth remains `.governance/`; skills and Markdown files are operator guidance, not authority.
+---
 
-## Policy Configuration
+## Policy Configuration (Policy-as-Code)
 
-Builtin policy:
+### Built-in Policy Engine
 
 ```yaml
 engine: builtin
 mode: enforce
 ```
 
-OPA policy:
+### Open Policy Agent (OPA) Integration
 
 ```yaml
 engine: opa
@@ -208,68 +244,61 @@ policy_dir: .governance/policies
 data_dir: .governance/policy_data
 ```
 
-Expected behavior:
+---
 
-- approved path: allow
-- forbidden path: block
-- outside intended scope: block unless explicit approval exists
-- destructive command: block unless explicit authorization exists
-- high-risk path: require human review, which blocks in enforce-mode hooks that do not represent review separately
+## Path Literal Validation
 
-## Audit Ledger
+GovRuntime validates path-like tool inputs and governance-document literals before treating them as execution or evidence targets.
 
-GovRuntime writes a local tamper-evident audit ledger at `.governance/audit/ledger.jsonl`.
+Checked property keys include: `file`, `file_path`, `filepath`, `filename`, `path`, `paths`, `target_file`, and `target_path`.
 
-This is not immutable storage. A malicious actor with filesystem access can delete or regenerate local logs. Stronger assurance requires signed checkpoints and external anchoring.
+Unresolved paths trigger warnings in `advisory` mode and hard blocks in `hard-block` mode.
 
-## Alpha Scope
+---
 
-`alpha-0.1.2` is intended for local experimentation, product-integration feedback, and case-scoped long-running work governance. It is not yet a stable hosted enforcement layer.
+## Audit Ledger & Tamper Evidence
 
-Included:
-
-- `.governance` bootstrap templates
-- runtime mode config
-- Claude/Codex/generic hook normalization
-- advisory and hard-block decisions
-- clean-state JSONL audit trail
-- path literal validation
-- case-scoped `gov` CLI for long-running work
-- generated context packs and Linear packets from append-only case evidence
-- stage ledger tracing, configurable stage coverage, configurable machine gates, and signed human gate closure
-- persistent collision-safe entity ID generation (`EV-*`, `CASE-*`, `DCK-*`, `JDG-*`, `DEC-*`, `INV-*`) across parallel CLI runs
-- recoverable branch abandon workflows in `govctl`
-- opt-in source tracing diagnostics and loader-pass error recovery
-- read-only MCP posture tools
-
-Not yet stable:
-
-- remote policy distribution
-- hosted dashboard APIs
-- signed audit logs
-- signed human approval verification beyond local artifact structure
-- full Cursor adapter contract
-- production-grade schema migrations
-
-## Development
-
-```bash
-pnpm build
-pnpm test
-```
-
-Tests use Node's built-in test runner against built package output, so run `pnpm build` before package-level tests.
-
-## Positioning
-
-GovRuntime is best understood as:
+GovRuntime maintains a local tamper-evident audit ledger:
 
 ```text
-AI Agent Governance / Developer Tooling / Runtime Control Plane
+.governance/audit/ledger.jsonl
+.governance/audit/clean_state.jsonl
 ```
 
-It is adjacent to CI, policy-as-code, MCP, and agent observability, but its core identity is execution governance for coding agents.
+The audit trail tracks process mode, active case/ticket IDs, and posture cleanliness for every agent lifecycle event (`init -> run-task -> exit-check`).
+
+---
+
+## Alpha Scope & Stability Matrix
+
+| Feature Category | Status in `0.1.3-alpha` |
+|---|---|
+| Persistent Collision-Safe IDs | **Stable** (`id_store` disk allocation) |
+| Claude & Codex Hook Adapters | **Stable** (`govctl hook auto`) |
+| Advisory & Hard-Block Enforcement | **Stable** (`GOVRUNTIME_ENFORCEMENT_MODE`) |
+| Case-Scoped `gov` Runtime | **Stable** (Stage ledger & gate closure) |
+| Recoverable Branch Abandonment | **Stable** (`govctl` workflow recovery) |
+| Read-Only MCP Server | **Beta** (`@govruntime/mcp-server`) |
+| Remote Policy Distribution | *In Progress* |
+| Hosted Dashboard APIs | *In Progress* |
+
+---
+
+## Development & Testing
+
+```bash
+# Build all workspace packages
+pnpm build
+
+# Run unit and integration tests across workspace
+pnpm test
+
+# Typecheck workspace TypeScript sources
+pnpm typecheck
+```
+
+---
 
 ## License
 
-Apache-2.0. See `LICENSE`.
+Apache-2.0. See `LICENSE` for details.
