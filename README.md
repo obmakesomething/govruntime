@@ -41,8 +41,8 @@ CI checks what changed. GovRuntime governs how the change happened.
 
 ## Packages
 
-- `@govruntime/govd`: core governance engine. Loads `.governance/*`, judges tool use, records docket/audit events, validates path literals, and renders context packs.
-- `@govruntime/govctl`: CLI and platform adapter layer. Provides `govctl` commands for repo posture and hook routing, plus the `gov` case runtime for long-running work governance.
+- `@govruntime/govd`: core governance engine. Loads `.governance/*`, judges tool use, records docket/audit events, validates path literals, manages persistent collision-safe entity ID sequences, and renders context packs.
+- `@govruntime/govctl`: CLI and platform adapter layer. Provides `govctl` commands for repo posture, branch abandon recovery, and hook routing, plus the `gov` case runtime for long-running work governance.
 - `@govruntime/mcp-server`: read-only MCP server for current posture, active ticket, and docket-derived why.
 
 ## Product Shape
@@ -237,6 +237,9 @@ Included:
 - case-scoped `gov` CLI for long-running work
 - generated context packs and Linear packets from append-only case evidence
 - stage ledger tracing, configurable stage coverage, configurable machine gates, and signed human gate closure
+- persistent collision-safe entity ID generation (`EV-*`, `CASE-*`, `DCK-*`, `JDG-*`, `DEC-*`, `INV-*`) across parallel CLI runs
+- recoverable branch abandon workflows in `govctl`
+- opt-in source tracing diagnostics and loader-pass error recovery
 - read-only MCP posture tools
 
 Not yet stable:
