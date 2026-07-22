@@ -2,7 +2,7 @@
  * @govruntime/govd — Public API
  */
 // State
-export { loadState, readYamlFile, readJsonlFile, readAllYamlFiles, govPath } from "./state/loader.js";
+export { loadState, readYamlFile, readJsonlFile, readJsonlFileStrict, readAllYamlFiles, govPath } from "./state/loader.js";
 export type { LoadStateOptions, SourceReadOutcome, SourceReadTrace } from "./state/loader.js";
 export * from "./state/types.js";
 export * from "./state/ids.js";
@@ -36,14 +36,14 @@ export {
 } from "./validation/path_literals.js";
 export type { PathLiteralFinding, PathLiteralSeverity } from "./validation/path_literals.js";
 // Context Pack
-export { renderContextPack, syncAgentRules } from "./context/pack_renderer.js";
+export { renderContextPack, syncAgentRules, syncAgentRulesStrict } from "./context/pack_renderer.js";
 // Ticket
 export { issueTicket, reissueTicket, pauseTicket, resumeTicket, updateTicketStatus } from "./ticket/engine.js";
 // Decisions and Invariants
 export { recordDecision, createInvariant, findActiveInvariants, checkInvariants } from "./decision/engine.js";
 export type { RecordDecisionInput, CreateInvariantInput, InvariantFinding } from "./decision/engine.js";
 // Branch Ledger
-export { createBranchEntry, updateBranchStatus, findActiveBranchForTicket, listBranches, buildBranchName, buildWorktreePath, } from "./branch/ledger.js";
+export { createBranchEntry, updateBranchStatus, withBranchLedgerLock, findActiveBranchForTicket, listBranches, buildBranchName, buildWorktreePath, } from "./branch/ledger.js";
 // Handlers
 export { handleSessionStart } from "./handlers/session_start.js";
 export { handleUserPrompt } from "./handlers/user_prompt.js";

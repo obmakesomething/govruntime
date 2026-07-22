@@ -131,14 +131,25 @@ function fingerprintBytes(bytes: Buffer): string {
 
 function readJsonlFile<T = any>(filePath: string): T[] {
   try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    return raw
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map((line) => JSON.parse(line) as T);
+    return readJsonlFileStrict<T>(filePath);
   } catch {
     return [];
   }
+}
+
+function readJsonlFileStrict<T = any>(filePath: string): T[] {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const records: T[] = [];
+  for (const [index, line] of raw.split("\n").entries()) {
+    if (line.trim().length === 0) continue;
+    try {
+      records.push(JSON.parse(line) as T);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid JSONL at ${filePath}:${index + 1}: ${detail}`);
+    }
+  }
+  return records;
 }
 
 function readAllYamlFiles<T>(dirPath: string): T[] {
@@ -629,5 +640,5 @@ export function loadState(cwd: string, options: LoadStateOptions = {}): Governan
 }
 
 // Re-export helper readers for use in other modules
-export { readYamlFile, readJsonlFile, readAllYamlFiles, govPath };
+export { readYamlFile, readJsonlFile, readJsonlFileStrict, readAllYamlFiles, govPath };
 export type { DocketEvent, Evidence };

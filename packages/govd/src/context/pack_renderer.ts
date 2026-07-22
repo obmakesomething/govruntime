@@ -235,12 +235,31 @@ function getRecentDocketEvents(
 }
 
 export function syncAgentRules(state: GovernanceState): void {
+  const result = syncAgentRuleTargets(state);
+  for (const failure of result.failures) {
+    console.error(`Failed to sync agent rules to ${failure.path}:`, failure.error);
+  }
+}
+
+export function syncAgentRulesStrict(state: GovernanceState): void {
+  const result = syncAgentRuleTargets(state);
+  if (result.failures.length === 0) return;
+  const details = result.failures
+    .map((failure) => `${failure.path}: ${failure.error instanceof Error ? failure.error.message : String(failure.error)}`)
+    .join("; ");
+  throw new Error(`Agent posture sync failed: ${details}`);
+}
+
+function syncAgentRuleTargets(state: GovernanceState): {
+  written: string[];
+  failures: Array<{ path: string; error: unknown }>;
+} {
   const cwd = state.cwd;
   const contextPack = renderContextPack(state);
 
   const startMarker = "<!-- GOV-POSTURE-START -->";
   const endMarker = "<!-- GOV-POSTURE-END -->";
-  const injection = `\n${startMarker}\n${contextPack}\n${endMarker}\n`;
+  const block = `${startMarker}\n${contextPack}\n${endMarker}`;
 
   const targets = [
     path.join(cwd, ".cursorrules"),
@@ -248,6 +267,8 @@ export function syncAgentRules(state: GovernanceState): void {
     path.join(cwd, ".github", "copilot-instructions.md"),
     path.join(cwd, "CLAUDE.md"),
   ];
+  const written: string[] = [];
+  const failures: Array<{ path: string; error: unknown }> = [];
 
   for (const targetPath of targets) {
     try {
@@ -264,21 +285,48 @@ export function syncAgentRules(state: GovernanceState): void {
       const startIndex = content.indexOf(startMarker);
       const endIndex = content.indexOf(endMarker);
 
-      if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-        content =
+      if ((startIndex === -1) !== (endIndex === -1) || (startIndex !== -1 && endIndex <= startIndex)) {
+        throw new Error("Malformed GOV posture markers require manual recovery.");
+      }
+
+      let nextContent: string;
+      if (startIndex !== -1 && endIndex !== -1) {
+        nextContent =
           content.slice(0, startIndex) +
-          injection +
+          block +
           content.slice(endIndex + endMarker.length);
       } else {
         if (content.length > 0 && !content.endsWith("\n")) {
           content += "\n";
         }
-        content += injection;
+        nextContent = content + `\n${block}\n`;
       }
 
-      fs.writeFileSync(targetPath, content, "utf8");
+      if (nextContent !== content) {
+        atomicWriteText(targetPath, nextContent);
+        written.push(targetPath);
+      }
+      if (fs.readFileSync(targetPath, "utf8") !== nextContent) {
+        throw new Error("Posture verification did not match the rendered content.");
+      }
     } catch (err) {
-      console.error(`Failed to sync agent rules to ${targetPath}:`, err);
+      failures.push({ path: targetPath, error: err });
+    }
+  }
+
+  return { written, failures };
+}
+
+function atomicWriteText(filePath: string, content: string): void {
+  const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  try {
+    fs.writeFileSync(tmp, content, "utf8");
+    fs.renameSync(tmp, filePath);
+  } finally {
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+      // Preserve the original write failure.
     }
   }
 }
